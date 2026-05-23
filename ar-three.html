@@ -6,15 +6,23 @@
   <meta name="theme-color" content="#000000">
   <title>Poster AR (Three.js)</title>
   <link rel="stylesheet" href="css/ui.css">
-  <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"></script>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.147.0/examples/jsm/",
+        "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+      }
+    }
+  </script>
 </head>
 <body class="ar">
 
   <div id="start-overlay" class="overlay-screen">
     <div class="card">
-      <h2>AR plaque (Three.js)</h2>
-      <p>Test du rendu AR direct via Three.js, sans A-Frame.</p>
+      <h2>AR plaque</h2>
+      <p>Pointe vers l'image cible apres avoir active la camera.</p>
       <button id="start-btn" class="btn primary">Activer la camera</button>
       <a href="ar.html" class="btn-link">Fallback HTML overlay</a>
     </div>
@@ -23,105 +31,72 @@
   <div id="ui-overlay" class="hidden">
     <a href="index.html" class="btn-icon back" aria-label="Retour">&larr;</a>
     <div id="hint" class="hint">Pointez vers une image du poster</div>
-    <div id="debug" class="debug">
-      <div>Mode : <span class="ok">Three.js</span></div>
-      <div>Etat : <span id="dbg-state">pret</span></div>
-      <div>Detection : <span id="dbg-detect">aucune</span></div>
-    </div>
   </div>
 
-  <div id="container" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1;background:#000;"></div>
+  <div id="container"></div>
 
-  <script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { MindARThree } from 'mindar-image-three';
+
     const startOverlay = document.getElementById('start-overlay');
     const startBtn = document.getElementById('start-btn');
     const uiOverlay = document.getElementById('ui-overlay');
     const hint = document.getElementById('hint');
-    const dbgState = document.getElementById('dbg-state');
-    const dbgDetect = document.getElementById('dbg-detect');
-
-    function setDbg(el, txt, cls) { el.textContent = txt; el.className = cls || ''; }
 
     startBtn.addEventListener('click', async () => {
       startBtn.disabled = true;
       startBtn.textContent = 'Chargement...';
       try {
-        if (!window.MINDAR || !window.MINDAR.IMAGE) throw new Error('MindAR non charge');
-        if (!window.THREE) throw new Error('Three.js non charge');
-
-        const mindarThree = new window.MINDAR.IMAGE.MindARThree({
-          container: document.querySelector('#container'),
+        const mindar = new MindARThree({
+          container: document.getElementById('container'),
           imageTargetSrc: './assets/targets.mind',
-          uiLoading: 'no',
-          uiScanning: 'no',
-          uiError: 'no'
+          uiLoading: 'no', uiScanning: 'no', uiError: 'no'
         });
-        setDbg(dbgState, 'instance creee', 'ok');
+        const { renderer, scene, camera } = mindar;
+        const anchor = mindar.addAnchor(0);
 
-        const { renderer, scene, camera } = mindarThree;
-        const anchor = mindarThree.addAnchor(0);
-
-        // Charger photo placeholder via TextureLoader
+        // Photo plaquee (placeholder picsum, ratio detecte automatiquement)
         const loader = new THREE.TextureLoader();
         loader.crossOrigin = 'anonymous';
-        const texture = loader.load(
-          'https://picsum.photos/seed/poster-ar/1200/900',
-          () => setDbg(dbgState, 'photo + mindar prets', 'ok'),
-          undefined,
-          (err) => setDbg(dbgState, 'photo err: ' + err, 'err')
-        );
+        const texture = loader.load('https://picsum.photos/seed/poster-ar/1200/900');
 
-        const geometry = new THREE.PlaneGeometry(1, 0.75);
-        const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.5 });
+        const geometry = new THREE.PlaneGeometry(1, 1);
+        const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
         const plane = new THREE.Mesh(geometry, material);
         anchor.group.add(plane);
-        anchor.group.visible = false; // cache jusqu'a detection
 
-        let scaleFixed = false;
-
+        // Adapter la taille du mesh a l'echelle de la cible compilee
+        let scaled = false;
         anchor.onTargetFound = () => {
           hint.classList.add('hidden');
-          setDbg(dbgDetect, 'detect...', 'ok');
-        };
-        anchor.onTargetLost = () => {
-          hint.classList.remove('hidden');
-          setDbg(dbgDetect, 'perdue', 'warn');
-        };
-
-        await mindarThree.start();
-        const container = document.querySelector('#container');
-        const nVideo = container.querySelectorAll('video').length;
-        const nCanvas = container.querySelectorAll('canvas').length;
-        setDbg(dbgState, `AR demarre (v=${nVideo}, c=${nCanvas})`, 'ok');
-
-        let frameCount = 0;
-        renderer.setAnimationLoop(() => {
-          if (anchor.group.visible) {
+          if (!scaled) {
             const m = anchor.group.matrix.elements;
-            const sx = Math.sqrt(m[0]**2 + m[1]**2 + m[2]**2);
-            // Compensation scale automatique + translation
-            if (!scaleFixed && sx > 10) {
-              const k = 1 / sx;
-              plane.scale.setScalar(k);
-              // Compense aussi la translation : divise les distances par sx
-              plane.position.set(0, 0, 0);
-              scaleFixed = true;
+            const sx = Math.sqrt(m[0]*m[0] + m[1]*m[1] + m[2]*m[2]);
+            if (sx > 10) {
+              // Ajuster aussi le ratio de la texture quand elle est chargee
+              const applyScale = () => {
+                const img = texture.image;
+                const ratio = (img && img.width && img.height) ? (img.height / img.width) : 0.75;
+                plane.scale.set(sx, sx * ratio, sx);
+              };
+              if (texture.image && texture.image.complete) applyScale();
+              else texture.addEventListener?.('load', applyScale);
+              applyScale();
+              scaled = true;
             }
-            if (frameCount % 30 === 0) {
-              setDbg(dbgDetect,
-                `sx=${sx.toFixed(0)} t=${m[12].toFixed(0)},${m[13].toFixed(0)},${m[14].toFixed(0)}`,
-                'ok');
-            }
-            frameCount++;
           }
-          renderer.render(scene, camera);
-        });
+        };
+        anchor.onTargetLost = () => hint.classList.remove('hidden');
+
+        await mindar.start();
+        renderer.setAnimationLoop(() => renderer.render(scene, camera));
 
         startOverlay.classList.add('hidden');
         uiOverlay.classList.remove('hidden');
       } catch (err) {
         console.error(err);
-        setDbg(dbgState, 'erreur: ' + (err.message || err), 'err');
+        alert('Erreur : ' + err.message);
         startBtn.disabled = false;
         startBtn.textContent = 'Reessayer';
       }
@@ -129,34 +104,16 @@
   </script>
 
   <style>
+    #container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; background: #000; }
     #container > video, #container > canvas {
       position: absolute !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
+      top: 0 !important; left: 0 !important;
+      width: 100% !important; height: 100% !important;
       object-fit: cover;
     }
     #ui-overlay { z-index: 500; pointer-events: none; }
+    #ui-overlay .btn-icon, #ui-overlay .hint { pointer-events: auto; }
     #start-overlay { z-index: 1000; }
-    /* Debug super visible, par-dessus tout */
-    #debug {
-      position: fixed !important;
-      top: 12px !important;
-      left: 12px !important;
-      right: 12px !important;
-      background: rgba(0, 0, 0, 0.95) !important;
-      color: #0f0 !important;
-      padding: 12px !important;
-      font-family: monospace !important;
-      font-size: 14px !important;
-      border: 2px solid #0f0 !important;
-      border-radius: 6px !important;
-      z-index: 99999 !important;
-      pointer-events: auto;
-      line-height: 1.5;
-    }
-    #debug span { color: white !important; word-break: break-all; }
   </style>
 
 </body>
