@@ -1,31 +1,25 @@
-// Configuration des cibles : contenu HTML affiche en overlay (hors WebGL)
-// Pratique pour textes longs, liens, listes, qu'on ne veut pas dans la scene 3D.
+// Configuration des cibles : contenu HTML affiche en overlay plein ecran
+// quand MindAR detecte l'image cible.
+// Types supportes: 'photo', 'video', 'info'
 const CONTENT = {
   'target-0': {
-    type: 'photo' // photo plaquee dans la scene 3D, pas de panneau HTML overlay
+    type: 'photo',
+    src: 'https://picsum.photos/seed/poster-ar/1200/900',
+    caption: 'Cible 1 detectee. Remplace par ta photo dans js/ar-content.js'
   },
   'target-1': {
-    type: 'video'
+    type: 'video',
+    src: 'assets/videos/clip1.mp4', // a fournir
+    caption: 'Cible 2 detectee'
   },
   'target-2': {
-    type: 'model'
+    type: 'info',
+    html: `
+      <h2>Cible 3</h2>
+      <p>Contenu HTML libre : texte, listes, liens.</p>
+    `
   }
 };
-
-// Adapte le ratio largeur/hauteur de la photo plaquee a son ratio naturel
-function fitImageOverlay(imgId, overlayId) {
-  const img = document.getElementById(imgId);
-  const overlay = document.getElementById(overlayId);
-  if (!img || !overlay) return;
-  const apply = () => {
-    if (!img.naturalWidth) return;
-    const ratio = img.naturalHeight / img.naturalWidth;
-    overlay.setAttribute('width', 1);
-    overlay.setAttribute('height', ratio);
-  };
-  if (img.complete) apply();
-  else img.addEventListener('load', apply, { once: true });
-}
 
 document.addEventListener('DOMContentLoaded', () => {
   const sceneEl = document.querySelector('a-scene');
@@ -33,9 +27,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const startBtn = document.getElementById('start-btn');
   const uiOverlay = document.getElementById('ui-overlay');
   const hint = document.getElementById('hint');
-  const infoPanel = document.getElementById('info-panel');
-  const infoContent = document.getElementById('info-content');
-  const infoClose = document.getElementById('info-close');
+  const overlay = document.getElementById('content-overlay');
+  const overlayBody = document.getElementById('overlay-body');
+  const overlayClose = document.getElementById('overlay-close');
 
   // Helpers debug
   const dbgMindar = document.getElementById('dbg-mindar');
@@ -47,29 +41,19 @@ document.addEventListener('DOMContentLoaded', () => {
     el.className = cls || '';
   };
 
-  // Demarrage caméra : declenche par interaction utilisateur (iOS Safari)
+  // Demarrage camera : interaction utilisateur requise (iOS / Chrome)
   startBtn.addEventListener('click', async () => {
     startBtn.disabled = true;
     startBtn.textContent = 'Chargement...';
     try {
-      // Attendre que A-Frame ait initialise le systeme MindAR
       await waitForSystem(sceneEl);
       const arSystem = sceneEl.systems['mindar-image-system'];
-      setDbg(dbgMindar, 'initialise', 'ok');
+      setDbg(dbgMindar, 'init', 'ok');
       await arSystem.start();
       setDbg(dbgMindar, 'demarre', 'ok');
-
-      // Compter cibles chargees (best-effort, API interne MindAR)
-      try {
-        const n = arSystem.controller?.imageTargets?.length
-               ?? arSystem.controller?.inputWidth ? '?' : '?';
-        const real = arSystem.controller?.imageTargets?.length
-                   ?? arSystem.el?.querySelectorAll('[mindar-image-target]').length;
-        setDbg(dbgTargets, String(real ?? '?'), 'ok');
-      } catch (e) {
-        setDbg(dbgTargets, 'inconnu', 'warn');
-      }
-
+      const n = arSystem.controller?.imageTargets?.length
+             ?? sceneEl.querySelectorAll('[mindar-image-target]').length;
+      setDbg(dbgTargets, String(n), 'ok');
       startOverlay.classList.add('hidden');
       uiOverlay.classList.remove('hidden');
     } catch (err) {
@@ -77,57 +61,72 @@ document.addEventListener('DOMContentLoaded', () => {
       setDbg(dbgMindar, 'erreur: ' + (err.message || err), 'err');
       startBtn.disabled = false;
       startBtn.textContent = 'Reessayer';
-      alert('Impossible d\'activer la camera. Verifiez l\'autorisation dans les reglages du navigateur.');
+      alert('Impossible d\'activer la camera.');
     }
   });
 
-  // Adapter ratio photo cible 0 a sa taille reelle (auto)
-  fitImageOverlay('photo-0', 'overlay-photo-0');
+  // Affichage du contenu dans l'overlay HTML
+  function showContent(targetId) {
+    const c = CONTENT[targetId];
+    if (!c) return;
+    overlayBody.innerHTML = '';
+    if (c.type === 'photo') {
+      const img = document.createElement('img');
+      img.src = c.src;
+      img.alt = c.caption || '';
+      img.className = 'overlay-photo';
+      overlayBody.appendChild(img);
+      if (c.caption) {
+        const cap = document.createElement('p');
+        cap.className = 'overlay-caption';
+        cap.textContent = c.caption;
+        overlayBody.appendChild(cap);
+      }
+    } else if (c.type === 'video') {
+      const video = document.createElement('video');
+      video.src = c.src;
+      video.controls = true;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.className = 'overlay-video';
+      overlayBody.appendChild(video);
+    } else if (c.type === 'info') {
+      const div = document.createElement('div');
+      div.className = 'overlay-info';
+      div.innerHTML = c.html;
+      overlayBody.appendChild(div);
+    }
+    overlay.classList.remove('hidden');
+  }
 
-  // Brancher les evenements de detection sur chaque cible
+  function hideContent() {
+    overlay.classList.add('hidden');
+    overlayBody.innerHTML = ''; // stoppe les videos
+  }
+
+  // Brancher detection MindAR sur chaque cible
   Object.keys(CONTENT).forEach((targetId) => {
     const el = document.getElementById(targetId);
     if (!el) return;
 
-    let scaleFixApplied = false;
-    const wrapperId = targetId.replace('target-', 'content-');
-    const wrapper = document.getElementById(wrapperId);
-
     el.addEventListener('targetFound', () => {
       hint.classList.add('hidden');
-      setTimeout(() => {
-        if (!el.object3D) return;
-        const m = el.object3D.matrix.elements;
-        const sx = Math.sqrt(m[0]*m[0] + m[1]*m[1] + m[2]*m[2]);
-        if (!scaleFixApplied && sx > 10 && wrapper) {
-          const k = 1 / sx;
-          // Passer par setAttribute pour que A-Frame ne reset pas le scale
-          wrapper.setAttribute('scale', `${k} ${k} ${k}`);
-          scaleFixApplied = true;
-          setDbg(dbgDetect, `${targetId} (k=${k.toExponential(2)})`, 'ok');
-        } else {
-          setDbg(dbgDetect, `${targetId} (sx=${sx.toFixed(0)}, fixed=${scaleFixApplied})`, 'ok');
-        }
-      }, 200);
-      const c = CONTENT[targetId];
-      if (c.type === 'info' && c.html) {
-        infoContent.innerHTML = c.html;
-        infoPanel.classList.remove('hidden');
-      }
+      setDbg(dbgDetect, targetId, 'ok');
+      showContent(targetId);
     });
 
     el.addEventListener('targetLost', () => {
       hint.classList.remove('hidden');
       setDbg(dbgDetect, 'perdue', 'warn');
+      // L'overlay reste ouvert : l'utilisateur ferme manuellement.
+      // Decommenter pour fermer automatiquement :
+      // hideContent();
     });
   });
 
-  infoClose.addEventListener('click', () => {
-    infoPanel.classList.add('hidden');
-  });
+  overlayClose.addEventListener('click', hideContent);
 });
 
-// Helper : attend que MindAR soit charge
 function waitForSystem(sceneEl) {
   return new Promise((resolve) => {
     if (sceneEl.hasLoaded && sceneEl.systems['mindar-image-system']) {

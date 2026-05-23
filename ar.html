@@ -32,10 +32,10 @@
     </div>
   </div>
 
-  <!-- Panneau d'information HTML déclenché par les cibles "info" -->
-  <div id="info-panel" class="info-panel hidden" role="dialog" aria-modal="true">
-    <button class="close" id="info-close" aria-label="Fermer">&times;</button>
-    <div id="info-content"></div>
+  <!-- Overlay HTML plein ecran declenche par les cibles -->
+  <div id="content-overlay" class="content-overlay hidden" role="dialog" aria-modal="true">
+    <button class="close" id="overlay-close" aria-label="Fermer">&times;</button>
+    <div id="overlay-body"></div>
   </div>
 
   <!-- Scène AR -->
@@ -56,14 +56,8 @@
 
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <!-- CIBLE 0 : Wrapper rescale (compense le scale enorme de MindAR via JS) -->
-    <a-entity mindar-image-target="targetIndex: 0" id="target-0">
-      <a-entity id="content-0">
-        <a-plane position="0 0 0" width="1" height="0.6" color="#00ff44"></a-plane>
-        <a-box position="0 0 0.1" scale="0.15 0.15 0.15" color="#ff0000"
-          animation="property: rotation; to: 0 360 0; loop: true; dur: 3000"></a-box>
-      </a-entity>
-    </a-entity>
+    <!-- CIBLE 0 : Detecteur invisible. Le contenu est affiche en HTML overlay (cf js/ar-content.js) -->
+    <a-entity mindar-image-target="targetIndex: 0" id="target-0"></a-entity>
 
     <!-- CIBLE 1 : Vidéo plaquée (placeholder = plan colore, swap par <a-video src="#video1">) -->
     <a-entity mindar-image-target="targetIndex: 1" id="target-1">
