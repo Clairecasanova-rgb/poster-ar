@@ -91,7 +91,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el.addEventListener('targetFound', () => {
       hint.classList.add('hidden');
-      setDbg(dbgDetect, 'cible ' + targetId, 'ok');
+      const visible = el.object3D ? el.object3D.visible : '?';
+      const children = el.object3D ? el.object3D.children.length : '?';
+      setDbg(dbgDetect, `${targetId} (vis=${visible}, ch=${children})`, 'ok');
       const c = CONTENT[targetId];
       if (c.type === 'info' && c.html) {
         infoContent.innerHTML = c.html;
