@@ -53,7 +53,12 @@
         const mindar = new MindARThree({
           container: document.getElementById('container'),
           imageTargetSrc: './assets/targets.mind',
-          uiLoading: 'no', uiScanning: 'no', uiError: 'no'
+          uiLoading: 'no', uiScanning: 'no', uiError: 'no',
+          // Lissage du tracking pour reduire le tremblement
+          filterMinCF: 0.001,    // freq de coupure min (plus haut = plus lisse)
+          filterBeta: 1000,      // beta du filtre OneEuro (plus haut = plus lisse)
+          missTolerance: 5,      // tolere 5 frames manquees avant 'lost'
+          warmupTolerance: 5     // confirme detection sur 5 frames
         });
         const { renderer, scene, camera } = mindar;
         const anchor = mindar.addAnchor(0);
