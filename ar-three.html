@@ -30,7 +30,9 @@
 
   <div id="ui-overlay" class="hidden">
     <a href="index.html" class="btn-icon back" aria-label="Retour">&larr;</a>
+    <button id="cam-toggle" class="cam-toggle" aria-label="Mode camera" title="Basculer vue camera (plein / complete)">&#x21F2;</button>
     <div id="hint" class="hint">Pointez vers une image du poster</div>
+    <div id="scan-frame" class="scan-frame"><span></span></div>
   </div>
 
   <div id="container"></div>
@@ -68,8 +70,10 @@
 
         // Adapter la taille du mesh a l'echelle de la cible compilee
         let scaled = false;
+        const scanFrame = document.getElementById('scan-frame');
         anchor.onTargetFound = () => {
           hint.classList.add('hidden');
+          scanFrame.classList.add('hidden');
           if (!scaled) {
             const m = anchor.group.matrix.elements;
             const sx = Math.sqrt(m[0]*m[0] + m[1]*m[1] + m[2]*m[2]);
@@ -87,13 +91,21 @@
             }
           }
         };
-        anchor.onTargetLost = () => hint.classList.remove('hidden');
+        anchor.onTargetLost = () => {
+          hint.classList.remove('hidden');
+          scanFrame.classList.remove('hidden');
+        };
 
         await mindar.start();
         renderer.setAnimationLoop(() => renderer.render(scene, camera));
 
         startOverlay.classList.add('hidden');
         uiOverlay.classList.remove('hidden');
+
+        // Toggle plein ecran (cover) <-> voir tout (contain)
+        document.getElementById('cam-toggle').addEventListener('click', () => {
+          document.body.classList.toggle('camera-contain');
+        });
       } catch (err) {
         console.error(err);
         alert('Erreur : ' + err.message);
@@ -104,16 +116,47 @@
   </script>
 
   <style>
-    #container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; background: #000; }
+    #container {
+      position: fixed; top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      z-index: 1; background: #000;
+      overflow: hidden;
+    }
+    /* Cam et canvas Three.js : remplir plein ecran sans deformer.
+       cover = remplit tout, crop ce qui depasse. */
     #container > video, #container > canvas {
       position: absolute !important;
-      top: 0 !important; left: 0 !important;
-      width: 100% !important; height: 100% !important;
+      top: 50% !important;
+      left: 50% !important;
+      width: 100% !important;
+      height: 100% !important;
+      transform: translate(-50%, -50%);
       object-fit: cover;
+    }
+    /* Mode "contain" pour voir tout le flux camera (bandes noires possibles) */
+    body.camera-contain #container > video,
+    body.camera-contain #container > canvas {
+      object-fit: contain;
     }
     #ui-overlay { z-index: 500; pointer-events: none; }
     #ui-overlay .btn-icon, #ui-overlay .hint { pointer-events: auto; }
     #start-overlay { z-index: 1000; }
+
+    /* Bouton toggle vue cam (cover/contain) */
+    .cam-toggle {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 12px) + 8px);
+      right: 12px;
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      pointer-events: auto;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
   </style>
 
 </body>
