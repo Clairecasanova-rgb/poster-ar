@@ -58,38 +58,26 @@
         const { renderer, scene, camera } = mindar;
         const anchor = mindar.addAnchor(0);
 
-        // Photo plaquee (placeholder picsum, ratio detecte automatiquement)
+        // Photo plaquee : texture locale, ratio ajuste a la photo chargee
         const loader = new THREE.TextureLoader();
-        loader.crossOrigin = 'anonymous';
-        const texture = loader.load('https://picsum.photos/seed/poster-ar/1200/900');
+        const texture = loader.load('./assets/images/placeholder.jpg', (tex) => {
+          if (tex.image && tex.image.width && tex.image.height) {
+            const r = tex.image.height / tex.image.width;
+            plane.scale.set(1, r, 1);
+          }
+        });
 
+        // PlaneGeometry(1, 1) = exactement la taille de la cible dans le repere anchor
+        // (le repere MindAR est deja normalise, pas besoin de scaler par sx)
         const geometry = new THREE.PlaneGeometry(1, 1);
         const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
         const plane = new THREE.Mesh(geometry, material);
         anchor.group.add(plane);
 
-        // Adapter la taille du mesh a l'echelle de la cible compilee
-        let scaled = false;
         const scanFrame = document.getElementById('scan-frame');
         anchor.onTargetFound = () => {
           hint.classList.add('hidden');
           scanFrame.classList.add('hidden');
-          if (!scaled) {
-            const m = anchor.group.matrix.elements;
-            const sx = Math.sqrt(m[0]*m[0] + m[1]*m[1] + m[2]*m[2]);
-            if (sx > 10) {
-              // Ajuster aussi le ratio de la texture quand elle est chargee
-              const applyScale = () => {
-                const img = texture.image;
-                const ratio = (img && img.width && img.height) ? (img.height / img.width) : 0.75;
-                plane.scale.set(sx, sx * ratio, sx);
-              };
-              if (texture.image && texture.image.complete) applyScale();
-              else texture.addEventListener?.('load', applyScale);
-              applyScale();
-              scaled = true;
-            }
-          }
         };
         anchor.onTargetLost = () => {
           hint.classList.remove('hidden');
