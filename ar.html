@@ -47,10 +47,9 @@
     vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false">
 
-    <a-assets>
-      <!-- Photo placeholder pour la cible 0 (paysage 800x600, remplace par ta vraie photo) -->
-      <img id="photo-0" src="https://picsum.photos/seed/poster-ar/800/600" crossorigin="anonymous">
-      <!-- Pour ajouter une vraie photo locale :
+    <a-assets timeout="2000">
+      <!-- Pas d'assets externes pendant le debug.
+           Pour ajouter une photo plus tard :
            <img id="photo-0" src="assets/images/ma-photo.jpg" crossorigin="anonymous">
       -->
     </a-assets>
