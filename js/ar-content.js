@@ -2,25 +2,30 @@
 // Pratique pour textes longs, liens, listes, qu'on ne veut pas dans la scene 3D.
 const CONTENT = {
   'target-0': {
-    type: 'info',
-    html: `
-      <h2>Cible 1 — Fiche d'information</h2>
-      <p>Remplacez ce contenu dans <code>js/ar-content.js</code>.</p>
-      <p>Vous pouvez afficher du texte riche, des liens, des listes&nbsp;:</p>
-      <ul>
-        <li>Photo&nbsp;: <em>assets/images/photo1.jpg</em></li>
-        <li>Localisation, dates, auteurs</li>
-        <li>Liens externes</li>
-      </ul>
-    `
+    type: 'photo' // photo plaquee dans la scene 3D, pas de panneau HTML overlay
   },
   'target-1': {
-    type: 'video' // video plaquee dans la scene 3D, rien a afficher en overlay
+    type: 'video'
   },
   'target-2': {
     type: 'model'
   }
 };
+
+// Adapte le ratio largeur/hauteur de la photo plaquee a son ratio naturel
+function fitImageOverlay(imgId, overlayId) {
+  const img = document.getElementById(imgId);
+  const overlay = document.getElementById(overlayId);
+  if (!img || !overlay) return;
+  const apply = () => {
+    if (!img.naturalWidth) return;
+    const ratio = img.naturalHeight / img.naturalWidth;
+    overlay.setAttribute('width', 1);
+    overlay.setAttribute('height', ratio);
+  };
+  if (img.complete) apply();
+  else img.addEventListener('load', apply, { once: true });
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   const sceneEl = document.querySelector('a-scene');
@@ -50,6 +55,9 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Impossible d\'activer la camera. Verifiez l\'autorisation dans les reglages du navigateur.');
     }
   });
+
+  // Adapter ratio photo cible 0 a sa taille reelle (auto)
+  fitImageOverlay('photo-0', 'overlay-photo-0');
 
   // Brancher les evenements de detection sur chaque cible
   Object.keys(CONTENT).forEach((targetId) => {

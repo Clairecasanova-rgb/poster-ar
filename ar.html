@@ -43,36 +43,23 @@
     device-orientation-permission-ui="enabled: false">
 
     <a-assets>
-      <!-- Déclarer ici les assets locaux quand ils seront ajoutés :
-           <video id="video1" src="assets/videos/clip1.mp4" preload="auto" loop playsinline webkit-playsinline crossorigin="anonymous"></video>
-           <a-asset-item id="model1" src="assets/models/object.glb"></a-asset-item>
-           <img id="photo1" src="assets/images/photo1.jpg" crossorigin="anonymous">
+      <!-- Photo placeholder pour la cible 0 (paysage 800x600, remplace par ta vraie photo) -->
+      <img id="photo-0" src="https://picsum.photos/seed/poster-ar/800/600" crossorigin="anonymous">
+      <!-- Pour ajouter une vraie photo locale :
+           <img id="photo-0" src="assets/images/ma-photo.jpg" crossorigin="anonymous">
       -->
     </a-assets>
 
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <!-- CIBLE 0 : Fiche d'information + photo (placeholder) -->
+    <!-- CIBLE 0 : Photo plaquee sur l'image detectee -->
     <a-entity mindar-image-target="targetIndex: 0" id="target-0">
-      <a-plane
-        position="0 0 0"
-        height="0.6" width="1"
-        color="#1a1a2e" opacity="0.88"
-        material="shader: flat"></a-plane>
-      <a-text
-        value="Fiche d'information"
-        position="-0.45 0.2 0.01"
-        color="#ffffff"
-        width="1.4"
-        align="left"
-        font="https://cdn.aframe.io/fonts/Roboto-msdf.json"></a-text>
-      <a-text
-        value="Cible 0 detectee.\nRemplace ce contenu par photo + texte\ndans ar.html (section CIBLE 0)."
-        position="-0.45 -0.05 0.01"
-        color="#cccccc"
-        width="1"
-        align="left"
-        font="https://cdn.aframe.io/fonts/Roboto-msdf.json"></a-text>
+      <a-image
+        id="overlay-photo-0"
+        src="#photo-0"
+        position="0 0 0.01"
+        width="1" height="0.75"
+        material="shader: flat; transparent: true"></a-image>
     </a-entity>
 
     <!-- CIBLE 1 : Vidéo plaquée (placeholder = plan colore, swap par <a-video src="#video1">) -->
