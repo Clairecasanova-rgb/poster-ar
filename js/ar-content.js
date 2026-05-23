@@ -37,6 +37,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const infoContent = document.getElementById('info-content');
   const infoClose = document.getElementById('info-close');
 
+  // Helpers debug
+  const dbgMindar = document.getElementById('dbg-mindar');
+  const dbgTargets = document.getElementById('dbg-targets');
+  const dbgDetect = document.getElementById('dbg-detect');
+  const setDbg = (el, txt, cls) => {
+    if (!el) return;
+    el.textContent = txt;
+    el.className = cls || '';
+  };
+
   // Demarrage caméra : declenche par interaction utilisateur (iOS Safari)
   startBtn.addEventListener('click', async () => {
     startBtn.disabled = true;
@@ -45,11 +55,26 @@ document.addEventListener('DOMContentLoaded', () => {
       // Attendre que A-Frame ait initialise le systeme MindAR
       await waitForSystem(sceneEl);
       const arSystem = sceneEl.systems['mindar-image-system'];
+      setDbg(dbgMindar, 'initialise', 'ok');
       await arSystem.start();
+      setDbg(dbgMindar, 'demarre', 'ok');
+
+      // Compter cibles chargees (best-effort, API interne MindAR)
+      try {
+        const n = arSystem.controller?.imageTargets?.length
+               ?? arSystem.controller?.inputWidth ? '?' : '?';
+        const real = arSystem.controller?.imageTargets?.length
+                   ?? arSystem.el?.querySelectorAll('[mindar-image-target]').length;
+        setDbg(dbgTargets, String(real ?? '?'), 'ok');
+      } catch (e) {
+        setDbg(dbgTargets, 'inconnu', 'warn');
+      }
+
       startOverlay.classList.add('hidden');
       uiOverlay.classList.remove('hidden');
     } catch (err) {
       console.error('AR start failed', err);
+      setDbg(dbgMindar, 'erreur: ' + (err.message || err), 'err');
       startBtn.disabled = false;
       startBtn.textContent = 'Reessayer';
       alert('Impossible d\'activer la camera. Verifiez l\'autorisation dans les reglages du navigateur.');
@@ -66,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el.addEventListener('targetFound', () => {
       hint.classList.add('hidden');
+      setDbg(dbgDetect, 'cible ' + targetId, 'ok');
       const c = CONTENT[targetId];
       if (c.type === 'info' && c.html) {
         infoContent.innerHTML = c.html;
@@ -75,9 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el.addEventListener('targetLost', () => {
       hint.classList.remove('hidden');
-      // Ne pas fermer automatiquement le panneau infos : laisse l'utilisateur lire.
-      // Decommenter la ligne suivante pour fermer a la perte de cible :
-      // infoPanel.classList.add('hidden');
+      setDbg(dbgDetect, 'perdue', 'warn');
     });
   });
 
