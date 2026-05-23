@@ -30,7 +30,7 @@
     </div>
   </div>
 
-  <div id="container"></div>
+  <div id="container" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1;background:#000;"></div>
 
   <script>
     const startOverlay = document.getElementById('start-overlay');
@@ -86,7 +86,10 @@
         };
 
         await mindarThree.start();
-        setDbg(dbgState, 'AR demarre', 'ok');
+        const container = document.querySelector('#container');
+        const nVideo = container.querySelectorAll('video').length;
+        const nCanvas = container.querySelectorAll('canvas').length;
+        setDbg(dbgState, `AR demarre (v=${nVideo}, c=${nCanvas})`, 'ok');
 
         renderer.setAnimationLoop(() => {
           renderer.render(scene, camera);
@@ -104,8 +107,16 @@
   </script>
 
   <style>
-    #container { position: fixed; inset: 0; }
-    #container canvas { display: block; width: 100% !important; height: 100% !important; }
+    #container > video, #container > canvas {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover;
+    }
+    #ui-overlay { z-index: 500; }
+    #start-overlay { z-index: 1000; }
   </style>
 
 </body>
