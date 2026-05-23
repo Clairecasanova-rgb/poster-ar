@@ -4,8 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
   <title>AR Minimal Test</title>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"></script>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -60,13 +58,25 @@
     }
     #start:disabled { opacity: 0.6; }
   </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.module.js",
+        "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+      }
+    }
+  </script>
 </head>
 <body>
   <div id="logs">Logs:<br></div>
   <div id="container"></div>
   <button id="start">DEMARRER</button>
 
-  <script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { MindARThree } from 'mindar-image-three';
+
     function log(msg, color) {
       const div = document.createElement('div');
       if (color) div.className = color;
@@ -77,20 +87,17 @@
       c.scrollTop = 999999;
     }
 
-    log('Page chargee');
-    log('THREE = ' + (typeof THREE));
-    log('MINDAR = ' + (typeof window.MINDAR));
-    log('MindARThree = ' + (window.MINDAR?.IMAGE?.MindARThree ? 'OK' : 'MISSING'));
+    log('Module charge OK');
+    log('THREE = ' + (typeof THREE) + ' / version ' + THREE.REVISION);
+    log('MindARThree = ' + (typeof MindARThree === 'function' ? 'OK' : 'MISSING'));
     log('UA = ' + navigator.userAgent.slice(0, 60));
 
     document.getElementById('start').addEventListener('click', async () => {
       log('Click DEMARRER');
       document.getElementById('start').disabled = true;
       try {
-        if (!window.MINDAR?.IMAGE?.MindARThree) throw new Error('MindAR pas dispo');
-
         log('Creation MindARThree...');
-        const mindar = new window.MINDAR.IMAGE.MindARThree({
+        const mindar = new MindARThree({
           container: document.getElementById('container'),
           imageTargetSrc: './assets/targets.mind',
           uiLoading: 'no', uiScanning: 'no', uiError: 'no'
@@ -106,7 +113,7 @@
           new THREE.MeshBasicMaterial({ color: 0xff00ff })
         );
         anchor.group.add(cube);
-        log('Cube magenta ajoute (0.3x0.3x0.3)');
+        log('Cube magenta ajoute');
 
         let detectCount = 0;
         anchor.onTargetFound = () => {
@@ -127,7 +134,7 @@
         log('MindAR demarre OK', 'y');
 
         const cont = document.getElementById('container');
-        log('container children: ' + cont.children.length + ' (video+canvas?)');
+        log('container children: ' + cont.children.length);
 
         renderer.setAnimationLoop(() => {
           renderer.render(scene, camera);
