@@ -73,6 +73,30 @@
   <div id="container"></div>
   <button id="start">DEMARRER</button>
 
+  <!-- Boot log classique : confirme que la page charge, indique support import maps -->
+  <script>
+    (function() {
+      const logs = document.getElementById('logs');
+      const append = (msg, color) => {
+        const div = document.createElement('div');
+        div.style.color = color || '#0ff';
+        div.textContent = '[BOOT] ' + msg;
+        logs.appendChild(div);
+      };
+      append('Page rendue (script classique OK) v=3');
+      append('UA = ' + navigator.userAgent.slice(0, 80));
+      const supportsImportMap = (typeof HTMLScriptElement !== 'undefined'
+        && HTMLScriptElement.supports && HTMLScriptElement.supports('importmap'));
+      append('import maps support = ' + supportsImportMap);
+      // Click handler de fallback si le module ne s'attache pas
+      document.getElementById('start').addEventListener('click', () => {
+        if (!window.__mindarStarted) {
+          append('Click DEMARRER mais module pas charge !', '#f55');
+        }
+      });
+    })();
+  </script>
+
   <script type="module">
     import * as THREE from 'three';
     import { MindARThree } from 'mindar-image-three';
@@ -87,6 +111,7 @@
       c.scrollTop = 999999;
     }
 
+    window.__mindarStarted = true;
     log('Module charge OK');
     log('THREE = ' + (typeof THREE) + ' / version ' + THREE.REVISION);
     log('MindARThree = ' + (typeof MindARThree === 'function' ? 'OK' : 'MISSING'));
