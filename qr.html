@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Poster AR — Générateur QR code</title>
+  <link rel="stylesheet" href="css/ui.css">
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+</head>
+<body class="landing qr">
+  <main class="qr-main">
+    <h1>QR code à imprimer</h1>
+    <p class="lead">Génère un QR code qui ouvre l'expérience AR au scan.</p>
+
+    <input type="url" id="url-input" class="url-input" placeholder="https://...">
+    <div id="qr-canvas"></div>
+
+    <div class="qr-actions">
+      <button id="download-btn" class="btn primary">Télécharger PNG</button>
+      <a href="index.html" class="btn secondary">Retour</a>
+    </div>
+
+    <details class="help" style="margin-top:24px">
+      <summary>Conseils d'impression</summary>
+      <ul>
+        <li>Taille minimum&nbsp;: <strong>3 × 3 cm</strong> sur le poster.</li>
+        <li>Contraste élevé&nbsp;: QR noir sur fond blanc, pas de motif derrière.</li>
+        <li>Marge blanche d'au moins 4 mm autour du QR (zone de silence).</li>
+        <li>Test après impression&nbsp;: scanne avec 2 téléphones avant tirage final.</li>
+      </ul>
+    </details>
+  </main>
+
+  <script>
+    const urlInput = document.getElementById('url-input');
+    const qrContainer = document.getElementById('qr-canvas');
+    const downloadBtn = document.getElementById('download-btn');
+
+    // URL par defaut = ar.html relatif a l'origine actuelle
+    const defaultUrl = new URL('ar.html', location.href).toString();
+    urlInput.value = defaultUrl;
+
+    function render(url) {
+      qrContainer.innerHTML = '';
+      const canvas = document.createElement('canvas');
+      qrContainer.appendChild(canvas);
+      QRCode.toCanvas(canvas, url, {
+        width: 320,
+        margin: 2,
+        errorCorrectionLevel: 'H',
+        color: { dark: '#000000', light: '#ffffff' }
+      }, (err) => {
+        if (err) console.error(err);
+      });
+    }
+
+    urlInput.addEventListener('input', () => render(urlInput.value));
+    render(defaultUrl);
+
+    downloadBtn.addEventListener('click', () => {
+      const canvas = qrContainer.querySelector('canvas');
+      if (!canvas) return;
+      const link = document.createElement('a');
+      link.download = 'poster-ar-qr.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+  </script>
+</body>
+</html>

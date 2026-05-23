@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+  <meta name="theme-color" content="#000000">
+  <title>Poster AR — Caméra</title>
+  <link rel="stylesheet" href="css/ui.css">
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+</head>
+<body class="ar">
+
+  <!-- Overlay de démarrage (iOS exige une interaction utilisateur avant caméra) -->
+  <div id="start-overlay" class="overlay-screen">
+    <div class="card">
+      <h2>Prêt&nbsp;?</h2>
+      <p>Autorisez la caméra puis pointez vers une image du poster.</p>
+      <button id="start-btn" class="btn primary">Activer la caméra</button>
+      <a href="index.html" class="btn-link">Retour</a>
+    </div>
+  </div>
+
+  <!-- UI overlay (toujours présent au-dessus de la scène) -->
+  <div id="ui-overlay" class="hidden">
+    <a href="index.html" class="btn-icon back" aria-label="Retour">&larr;</a>
+    <div id="hint" class="hint">Pointez vers une image du poster</div>
+  </div>
+
+  <!-- Panneau d'information HTML déclenché par les cibles "info" -->
+  <div id="info-panel" class="info-panel hidden" role="dialog" aria-modal="true">
+    <button class="close" id="info-close" aria-label="Fermer">&times;</button>
+    <div id="info-content"></div>
+  </div>
+
+  <!-- Scène AR -->
+  <a-scene
+    mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.mind; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;"
+    color-space="sRGB"
+    embedded
+    renderer="colorManagement: true, physicallyCorrectLights: true"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false">
+
+    <a-assets>
+      <!-- Déclarer ici les assets locaux quand ils seront ajoutés :
+           <video id="video1" src="assets/videos/clip1.mp4" preload="auto" loop playsinline webkit-playsinline crossorigin="anonymous"></video>
+           <a-asset-item id="model1" src="assets/models/object.glb"></a-asset-item>
+           <img id="photo1" src="assets/images/photo1.jpg" crossorigin="anonymous">
+      -->
+    </a-assets>
+
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <!-- CIBLE 0 : Fiche d'information + photo (placeholder) -->
+    <a-entity mindar-image-target="targetIndex: 0" id="target-0">
+      <a-plane
+        position="0 0 0"
+        height="0.6" width="1"
+        color="#1a1a2e" opacity="0.88"
+        material="shader: flat"></a-plane>
+      <a-text
+        value="Fiche d'information"
+        position="-0.45 0.2 0.01"
+        color="#ffffff"
+        width="1.4"
+        align="left"
+        font="https://cdn.aframe.io/fonts/Roboto-msdf.json"></a-text>
+      <a-text
+        value="Cible 0 detectee.\nRemplace ce contenu par photo + texte\ndans ar.html (section CIBLE 0)."
+        position="-0.45 -0.05 0.01"
+        color="#cccccc"
+        width="1"
+        align="left"
+        font="https://cdn.aframe.io/fonts/Roboto-msdf.json"></a-text>
+    </a-entity>
+
+    <!-- CIBLE 1 : Vidéo plaquée (placeholder = plan colore, swap par <a-video src="#video1">) -->
+    <a-entity mindar-image-target="targetIndex: 1" id="target-1">
+      <a-plane
+        position="0 0 0"
+        height="0.56" width="1"
+        color="#0f3460" opacity="0.88"
+        material="shader: flat"></a-plane>
+      <a-text
+        value="Video (placeholder)"
+        position="0 0.05 0.01"
+        color="#ffffff"
+        width="1.4"
+        align="center"
+        font="https://cdn.aframe.io/fonts/Roboto-msdf.json"></a-text>
+      <a-text
+        value="Ajoute assets/videos/clip1.mp4\npuis remplace par <a-video src=#video1>"
+        position="0 -0.1 0.01"
+        color="#cccccc"
+        width="1"
+        align="center"
+        font="https://cdn.aframe.io/fonts/Roboto-msdf.json"></a-text>
+    </a-entity>
+
+    <!-- CIBLE 2 : Modèle 3D (placeholder = cube rouge anime, swap par <a-gltf-model src="#model1">) -->
+    <a-entity mindar-image-target="targetIndex: 2" id="target-2">
+      <a-box
+        position="0 0.15 0"
+        scale="0.18 0.18 0.18"
+        color="#e94560"
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear"></a-box>
+      <a-text
+        value="Modele 3D (placeholder)"
+        position="0 -0.18 0"
+        color="#ffffff"
+        width="1.2"
+        align="center"
+        font="https://cdn.aframe.io/fonts/Roboto-msdf.json"></a-text>
+    </a-entity>
+
+  </a-scene>
+
+  <script src="js/ar-content.js"></script>
+</body>
+</html>
