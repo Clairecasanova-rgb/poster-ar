@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+  <title>Test MindAR officiel</title>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <style>
+    body { margin: 0; background: #000; overflow: hidden; }
+    #info {
+      position: fixed; top: 12px; left: 12px;
+      background: rgba(0,0,0,0.8); color: #0f0;
+      padding: 10px 14px; font-family: monospace; font-size: 12px;
+      z-index: 100; border-radius: 8px; line-height: 1.6;
+      max-width: 80vw;
+    }
+    #info b { color: #fff; }
+    .start {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.9); color: white;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 20px; padding: 24px; text-align: center;
+      font-family: -apple-system, sans-serif;
+    }
+    .start button {
+      padding: 14px 28px; border: none; border-radius: 999px;
+      background: #e94560; color: white; font-size: 1rem; font-weight: 600;
+      cursor: pointer;
+    }
+    .start.hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <div id="info">
+    <b>Test MindAR officiel</b><br>
+    Vise la carte (cf instructions)<br>
+    Etat : <span id="status">pret</span>
+  </div>
+
+  <div id="start-screen" class="start">
+    <h2>Test MindAR officiel</h2>
+    <p style="max-width:380px;line-height:1.5;opacity:0.9">
+      Affiche cette image en grand sur un ordinateur ou autre ecran,<br><br>
+      <a href="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.png"
+         target="_blank" style="color:#e94560">card.png officiel MindAR</a>
+      <br><br>
+      puis active la camera et pointe vers elle.
+    </p>
+    <button id="start-btn">Activer la camera</button>
+  </div>
+
+  <a-scene
+    mindar-image="imageTargetSrc: https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/examples/image-tracking/assets/card-example/card.mind; autoStart: false; uiLoading: no; uiError: no; uiScanning: no;"
+    color-space="sRGB"
+    embedded
+    renderer="colorManagement: true"
+    vr-mode-ui="enabled: false"
+    device-orientation-permission-ui="enabled: false">
+
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <!-- Cible 0 : Carte MindAR officielle (ratio 1 x 0.552 d'apres la doc) -->
+    <a-entity mindar-image-target="targetIndex: 0" id="target">
+      <a-plane color="#ff00ff" position="0 0 0" height="0.552" width="1" opacity="0.8"></a-plane>
+      <a-box position="0 0 0.2" scale="0.2 0.2 0.2" color="#ffff00"
+        animation="property: rotation; to: 0 360 0; loop: true; dur: 3000; easing: linear"></a-box>
+    </a-entity>
+  </a-scene>
+
+  <script>
+    const sceneEl = document.querySelector('a-scene');
+    const status = document.getElementById('status');
+    const startScreen = document.getElementById('start-screen');
+    const startBtn = document.getElementById('start-btn');
+    const target = document.getElementById('target');
+
+    startBtn.addEventListener('click', async () => {
+      status.textContent = 'demarrage...';
+      startBtn.disabled = true;
+      try {
+        if (!sceneEl.hasLoaded) await new Promise(r => sceneEl.addEventListener('loaded', r, { once: true }));
+        const arSystem = sceneEl.systems['mindar-image-system'];
+        await arSystem.start();
+        status.textContent = 'camera ok, en attente detection';
+        startScreen.classList.add('hidden');
+      } catch (e) {
+        status.textContent = 'erreur: ' + e.message;
+        startBtn.disabled = false;
+      }
+    });
+
+    target.addEventListener('targetFound', () => {
+      status.textContent = 'CIBLE DETECTEE';
+      const m = target.object3D.matrix.elements;
+      const sx = Math.sqrt(m[0]**2 + m[1]**2 + m[2]**2);
+      const tx = m[12], ty = m[13], tz = m[14];
+      setTimeout(() => {
+        status.innerHTML = `DETECTE<br>sx=${sx.toFixed(2)}<br>t=(${tx.toFixed(2)},${ty.toFixed(2)},${tz.toFixed(2)})`;
+      }, 100);
+    });
+    target.addEventListener('targetLost', () => {
+      status.textContent = 'perdue';
+    });
+  </script>
+
+</body>
+</html>
