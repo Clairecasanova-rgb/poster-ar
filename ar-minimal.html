@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+  <title>AR Minimal Test</title>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0;
+      background: #000; color: #fff;
+      font-family: -apple-system, monospace;
+    }
+    #logs {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 50vh;
+      background: rgba(0,0,0,0.95);
+      color: #0f0;
+      padding: 10px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      z-index: 9999;
+      border-bottom: 3px solid #0f0;
+    }
+    #logs .y { color: #ff0; }
+    #logs .r { color: #f55; font-weight: bold; }
+    #logs .o { color: #f80; }
+    #container {
+      position: fixed;
+      top: 50vh; left: 0; right: 0; bottom: 0;
+      background: #111;
+    }
+    #container > video, #container > canvas {
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover;
+    }
+    #start {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10000;
+      padding: 16px 32px;
+      background: #e94560;
+      color: white;
+      border: none;
+      border-radius: 999px;
+      font-size: 18px;
+      font-weight: bold;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    #start:disabled { opacity: 0.6; }
+  </style>
+</head>
+<body>
+  <div id="logs">Logs:<br></div>
+  <div id="container"></div>
+  <button id="start">DEMARRER</button>
+
+  <script>
+    function log(msg, color) {
+      const div = document.createElement('div');
+      if (color) div.className = color;
+      const t = new Date().toLocaleTimeString().slice(-8);
+      div.textContent = '[' + t + '] ' + msg;
+      const c = document.getElementById('logs');
+      c.appendChild(div);
+      c.scrollTop = 999999;
+    }
+
+    log('Page chargee');
+    log('THREE = ' + (typeof THREE));
+    log('MINDAR = ' + (typeof window.MINDAR));
+    log('MindARThree = ' + (window.MINDAR?.IMAGE?.MindARThree ? 'OK' : 'MISSING'));
+    log('UA = ' + navigator.userAgent.slice(0, 60));
+
+    document.getElementById('start').addEventListener('click', async () => {
+      log('Click DEMARRER');
+      document.getElementById('start').disabled = true;
+      try {
+        if (!window.MINDAR?.IMAGE?.MindARThree) throw new Error('MindAR pas dispo');
+
+        log('Creation MindARThree...');
+        const mindar = new window.MINDAR.IMAGE.MindARThree({
+          container: document.getElementById('container'),
+          imageTargetSrc: './assets/targets.mind',
+          uiLoading: 'no', uiScanning: 'no', uiError: 'no'
+        });
+        log('MindARThree cree');
+
+        const { renderer, scene, camera } = mindar;
+        const anchor = mindar.addAnchor(0);
+        log('Anchor 0 ajoute');
+
+        const cube = new THREE.Mesh(
+          new THREE.BoxGeometry(0.3, 0.3, 0.3),
+          new THREE.MeshBasicMaterial({ color: 0xff00ff })
+        );
+        anchor.group.add(cube);
+        log('Cube magenta ajoute (0.3x0.3x0.3)');
+
+        let detectCount = 0;
+        anchor.onTargetFound = () => {
+          detectCount++;
+          log('!!! TARGET FOUND #' + detectCount + ' !!!', 'y');
+          setTimeout(() => {
+            const m = anchor.group.matrix.elements;
+            const sx = Math.sqrt(m[0]*m[0] + m[1]*m[1] + m[2]*m[2]);
+            log('sx=' + sx.toFixed(2), 'y');
+            log('t=' + m[12].toFixed(2) + ',' + m[13].toFixed(2) + ',' + m[14].toFixed(2), 'y');
+            log('visible=' + anchor.group.visible, 'y');
+          }, 100);
+        };
+        anchor.onTargetLost = () => log('target lost', 'o');
+
+        log('Demarrage MindAR (camera)...');
+        await mindar.start();
+        log('MindAR demarre OK', 'y');
+
+        const cont = document.getElementById('container');
+        log('container children: ' + cont.children.length + ' (video+canvas?)');
+
+        renderer.setAnimationLoop(() => {
+          renderer.render(scene, camera);
+        });
+        log('Render loop active');
+
+        document.getElementById('start').style.display = 'none';
+      } catch (e) {
+        log('ERREUR: ' + e.message, 'r');
+        if (e.stack) log('stack: ' + e.stack.slice(0, 200), 'r');
+        document.getElementById('start').disabled = false;
+        document.getElementById('start').textContent = 'REESSAYER';
+      }
+    });
+  </script>
+</body>
+</html>
