@@ -90,24 +90,25 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!el) return;
 
     let scaleFixApplied = false;
+    const wrapperId = targetId.replace('target-', 'content-');
+    const wrapper = document.getElementById(wrapperId);
 
     el.addEventListener('targetFound', () => {
       hint.classList.add('hidden');
-      // Workaround: si la matrix de MindAR a un facteur d'echelle enorme
-      // (image source compilee trop grande), on compense en scalant les enfants.
       setTimeout(() => {
         if (!el.object3D) return;
         const m = el.object3D.matrix.elements;
         const sx = Math.sqrt(m[0]*m[0] + m[1]*m[1] + m[2]*m[2]);
-        if (!scaleFixApplied && sx > 10) {
+        if (!scaleFixApplied && sx > 10 && wrapper) {
           const k = 1 / sx;
-          el.object3D.children.forEach((c) => c.scale.setScalar(k));
+          // Passer par setAttribute pour que A-Frame ne reset pas le scale
+          wrapper.setAttribute('scale', `${k} ${k} ${k}`);
           scaleFixApplied = true;
-          setDbg(dbgDetect, `${targetId} (scale fix: ${k.toExponential(2)})`, 'ok');
+          setDbg(dbgDetect, `${targetId} (k=${k.toExponential(2)})`, 'ok');
         } else {
-          setDbg(dbgDetect, `${targetId} (sx=${sx.toFixed(2)})`, 'ok');
+          setDbg(dbgDetect, `${targetId} (sx=${sx.toFixed(0)}, fixed=${scaleFixApplied})`, 'ok');
         }
-      }, 250);
+      }, 200);
       const c = CONTENT[targetId];
       if (c.type === 'info' && c.html) {
         infoContent.innerHTML = c.html;
