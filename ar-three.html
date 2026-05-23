@@ -75,18 +75,17 @@
         const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
         const plane = new THREE.Mesh(geometry, material);
         anchor.group.add(plane);
-        anchor.group.visible = false; // cache jusqu'a detection effective
+        anchor.group.visible = false; // cache jusqu'a detection
+        anchor.group.matrixAutoUpdate = false; // MindAR controle la matrix
+
+        let scaleFixed = false;
 
         anchor.onTargetFound = () => {
           hint.classList.add('hidden');
-          anchor.group.visible = true;
-          const m = anchor.group.matrix.elements;
-          const sx = Math.sqrt(m[0]**2 + m[1]**2 + m[2]**2);
-          setDbg(dbgDetect, `target-0 sx=${sx.toFixed(2)}`, 'ok');
+          setDbg(dbgDetect, 'detect...', 'ok');
         };
         anchor.onTargetLost = () => {
           hint.classList.remove('hidden');
-          anchor.group.visible = false;
           setDbg(dbgDetect, 'perdue', 'warn');
         };
 
@@ -96,7 +95,26 @@
         const nCanvas = container.querySelectorAll('canvas').length;
         setDbg(dbgState, `AR demarre (v=${nVideo}, c=${nCanvas})`, 'ok');
 
+        let frameCount = 0;
         renderer.setAnimationLoop(() => {
+          if (anchor.group.visible) {
+            const m = anchor.group.matrix.elements;
+            const sx = Math.sqrt(m[0]**2 + m[1]**2 + m[2]**2);
+            // Compensation scale automatique + translation
+            if (!scaleFixed && sx > 10) {
+              const k = 1 / sx;
+              plane.scale.setScalar(k);
+              // Compense aussi la translation : divise les distances par sx
+              plane.position.set(0, 0, 0);
+              scaleFixed = true;
+            }
+            if (frameCount % 30 === 0) {
+              setDbg(dbgDetect,
+                `sx=${sx.toFixed(0)} t=${m[12].toFixed(0)},${m[13].toFixed(0)},${m[14].toFixed(0)}`,
+                'ok');
+            }
+            frameCount++;
+          }
           renderer.render(scene, camera);
         });
 
