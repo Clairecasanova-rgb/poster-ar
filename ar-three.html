@@ -54,11 +54,11 @@
           container: document.getElementById('container'),
           imageTargetSrc: './assets/targets.mind',
           uiLoading: 'no', uiScanning: 'no', uiError: 'no',
-          // Lissage du tracking pour reduire le tremblement
-          filterMinCF: 0.001,    // freq de coupure min (plus haut = plus lisse)
-          filterBeta: 1000,      // beta du filtre OneEuro (plus haut = plus lisse)
-          missTolerance: 5,      // tolere 5 frames manquees avant 'lost'
-          warmupTolerance: 5     // confirme detection sur 5 frames
+          // Lissage du tracking : valeurs PLUS PETITES = plus stable (filtre OneEuro)
+          filterMinCF: 0.00001,
+          filterBeta: 0.0001,
+          missTolerance: 10,    // tolere 10 frames manquees avant 'lost'
+          warmupTolerance: 5    // confirme detection sur 5 frames avant declaration
         });
         const { renderer, scene, camera } = mindar;
         const anchor = mindar.addAnchor(0);
