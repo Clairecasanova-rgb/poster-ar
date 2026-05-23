@@ -91,9 +91,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el.addEventListener('targetFound', () => {
       hint.classList.add('hidden');
-      const visible = el.object3D ? el.object3D.visible : '?';
-      const children = el.object3D ? el.object3D.children.length : '?';
-      setDbg(dbgDetect, `${targetId} (vis=${visible}, ch=${children})`, 'ok');
+      setDbg(dbgDetect, `${targetId} OK`, 'ok');
+      // Echantillonne position et scale 200ms apres detection (laisse temps a la matrix d'etre appliquee)
+      setTimeout(() => {
+        if (!el.object3D) return;
+        const p = el.object3D.position;
+        const s = el.object3D.scale;
+        const m = el.object3D.matrix.elements;
+        setDbg(dbgDetect,
+          `pos ${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)} | sc ${s.x.toFixed(3)} | m0 ${m[0].toFixed(3)}`,
+          'ok');
+      }, 250);
       const c = CONTENT[targetId];
       if (c.type === 'info' && c.html) {
         infoContent.innerHTML = c.html;
