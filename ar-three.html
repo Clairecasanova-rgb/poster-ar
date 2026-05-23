@@ -76,7 +76,6 @@
         const plane = new THREE.Mesh(geometry, material);
         anchor.group.add(plane);
         anchor.group.visible = false; // cache jusqu'a detection
-        anchor.group.matrixAutoUpdate = false; // MindAR controle la matrix
 
         let scaleFixed = false;
 
