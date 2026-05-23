@@ -75,13 +75,18 @@
         const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
         const plane = new THREE.Mesh(geometry, material);
         anchor.group.add(plane);
+        anchor.group.visible = false; // cache jusqu'a detection effective
 
         anchor.onTargetFound = () => {
           hint.classList.add('hidden');
-          setDbg(dbgDetect, 'target-0 OK', 'ok');
+          anchor.group.visible = true;
+          const m = anchor.group.matrix.elements;
+          const sx = Math.sqrt(m[0]**2 + m[1]**2 + m[2]**2);
+          setDbg(dbgDetect, `target-0 sx=${sx.toFixed(2)}`, 'ok');
         };
         anchor.onTargetLost = () => {
           hint.classList.remove('hidden');
+          anchor.group.visible = false;
           setDbg(dbgDetect, 'perdue', 'warn');
         };
 
