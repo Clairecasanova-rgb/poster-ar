@@ -89,18 +89,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById(targetId);
     if (!el) return;
 
+    let scaleFixApplied = false;
+
     el.addEventListener('targetFound', () => {
       hint.classList.add('hidden');
-      setDbg(dbgDetect, `${targetId} OK`, 'ok');
-      // Echantillonne position et scale 200ms apres detection (laisse temps a la matrix d'etre appliquee)
+      // Workaround: si la matrix de MindAR a un facteur d'echelle enorme
+      // (image source compilee trop grande), on compense en scalant les enfants.
       setTimeout(() => {
         if (!el.object3D) return;
-        const p = el.object3D.position;
-        const s = el.object3D.scale;
         const m = el.object3D.matrix.elements;
-        setDbg(dbgDetect,
-          `pos ${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)} | sc ${s.x.toFixed(3)} | m0 ${m[0].toFixed(3)}`,
-          'ok');
+        const sx = Math.sqrt(m[0]*m[0] + m[1]*m[1] + m[2]*m[2]);
+        if (!scaleFixApplied && sx > 10) {
+          const k = 1 / sx;
+          el.object3D.children.forEach((c) => c.scale.setScalar(k));
+          scaleFixApplied = true;
+          setDbg(dbgDetect, `${targetId} (scale fix: ${k.toExponential(2)})`, 'ok');
+        } else {
+          setDbg(dbgDetect, `${targetId} (sx=${sx.toFixed(2)})`, 'ok');
+        }
       }, 250);
       const c = CONTENT[targetId];
       if (c.type === 'info' && c.html) {
