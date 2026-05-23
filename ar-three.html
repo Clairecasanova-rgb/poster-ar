@@ -79,10 +79,14 @@
 
         let targetRatio = null; // height/width de la cible (deduit de la matrix MindAR)
 
+        // Facteur d'agrandissement du plane pour compenser l'imprecision tracking
+        // (1.0 = exact, 1.05 = 5% plus grand, 1.10 = 10% plus grand)
+        const OVERSIZE = 1.05;
+
         function applyFit() {
           if (!textureLoaded || targetRatio === null) return;
-          // 1. Ajuster le plane au ratio EXACT de la cible
-          plane.scale.set(1, targetRatio, 1);
+          // 1. Ajuster le plane au ratio cible + leger sur-dimensionnement
+          plane.scale.set(OVERSIZE, OVERSIZE * targetRatio, OVERSIZE);
           // 2. Calculer UV "cover" pour cropper la photo (pas de deformation)
           const tgtAspect = 1 / targetRatio; // largeur/hauteur cible
           const img = texture.image;
