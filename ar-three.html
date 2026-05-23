@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+  <meta name="theme-color" content="#000000">
+  <title>Poster AR (Three.js)</title>
+  <link rel="stylesheet" href="css/ui.css">
+  <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"></script>
+</head>
+<body class="ar">
+
+  <div id="start-overlay" class="overlay-screen">
+    <div class="card">
+      <h2>AR plaque (Three.js)</h2>
+      <p>Test du rendu AR direct via Three.js, sans A-Frame.</p>
+      <button id="start-btn" class="btn primary">Activer la camera</button>
+      <a href="ar.html" class="btn-link">Fallback HTML overlay</a>
+    </div>
+  </div>
+
+  <div id="ui-overlay" class="hidden">
+    <a href="index.html" class="btn-icon back" aria-label="Retour">&larr;</a>
+    <div id="hint" class="hint">Pointez vers une image du poster</div>
+    <div id="debug" class="debug">
+      <div>Mode : <span class="ok">Three.js</span></div>
+      <div>Etat : <span id="dbg-state">pret</span></div>
+      <div>Detection : <span id="dbg-detect">aucune</span></div>
+    </div>
+  </div>
+
+  <div id="container"></div>
+
+  <script>
+    const startOverlay = document.getElementById('start-overlay');
+    const startBtn = document.getElementById('start-btn');
+    const uiOverlay = document.getElementById('ui-overlay');
+    const hint = document.getElementById('hint');
+    const dbgState = document.getElementById('dbg-state');
+    const dbgDetect = document.getElementById('dbg-detect');
+
+    function setDbg(el, txt, cls) { el.textContent = txt; el.className = cls || ''; }
+
+    startBtn.addEventListener('click', async () => {
+      startBtn.disabled = true;
+      startBtn.textContent = 'Chargement...';
+      try {
+        if (!window.MINDAR || !window.MINDAR.IMAGE) throw new Error('MindAR non charge');
+        if (!window.THREE) throw new Error('Three.js non charge');
+
+        const mindarThree = new window.MINDAR.IMAGE.MindARThree({
+          container: document.querySelector('#container'),
+          imageTargetSrc: './assets/targets.mind',
+          uiLoading: 'no',
+          uiScanning: 'no',
+          uiError: 'no'
+        });
+        setDbg(dbgState, 'instance creee', 'ok');
+
+        const { renderer, scene, camera } = mindarThree;
+        const anchor = mindarThree.addAnchor(0);
+
+        // Charger photo placeholder via TextureLoader
+        const loader = new THREE.TextureLoader();
+        loader.crossOrigin = 'anonymous';
+        const texture = loader.load(
+          'https://picsum.photos/seed/poster-ar/1200/900',
+          () => setDbg(dbgState, 'photo + mindar prets', 'ok'),
+          undefined,
+          (err) => setDbg(dbgState, 'photo err: ' + err, 'err')
+        );
+
+        const geometry = new THREE.PlaneGeometry(1, 0.75);
+        const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+        const plane = new THREE.Mesh(geometry, material);
+        anchor.group.add(plane);
+
+        anchor.onTargetFound = () => {
+          hint.classList.add('hidden');
+          setDbg(dbgDetect, 'target-0 OK', 'ok');
+        };
+        anchor.onTargetLost = () => {
+          hint.classList.remove('hidden');
+          setDbg(dbgDetect, 'perdue', 'warn');
+        };
+
+        await mindarThree.start();
+        setDbg(dbgState, 'AR demarre', 'ok');
+
+        renderer.setAnimationLoop(() => {
+          renderer.render(scene, camera);
+        });
+
+        startOverlay.classList.add('hidden');
+        uiOverlay.classList.remove('hidden');
+      } catch (err) {
+        console.error(err);
+        setDbg(dbgState, 'erreur: ' + (err.message || err), 'err');
+        startBtn.disabled = false;
+        startBtn.textContent = 'Reessayer';
+      }
+    });
+  </script>
+
+  <style>
+    #container { position: fixed; inset: 0; }
+    #container canvas { display: block; width: 100% !important; height: 100% !important; }
+  </style>
+
+</body>
+</html>
