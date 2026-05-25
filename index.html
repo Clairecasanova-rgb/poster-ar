@@ -137,6 +137,9 @@
     startBtn.addEventListener('click', async () => {
       startBtn.disabled = true;
       startBtn.textContent = 'Chargement...';
+      // Masque l'overlay tout de suite et affiche l'UI camera (au cas ou mindar.start() bloque)
+      startOverlay.classList.add('hidden');
+      uiOverlay.classList.remove('hidden');
       try {
         const mindar = new MindARThree({
           container: document.getElementById('container'),
@@ -360,16 +363,15 @@
         await mindar.start();
         renderer.setAnimationLoop(() => renderer.render(scene, camera));
 
-        startOverlay.classList.add('hidden');
-        uiOverlay.classList.remove('hidden');
-
         // Toggle plein ecran (cover) <-> voir tout (contain)
         document.getElementById('cam-toggle').addEventListener('click', () => {
           document.body.classList.toggle('camera-contain');
         });
       } catch (err) {
         console.error(err);
-        // Afficher l'erreur de facon visible
+        // Re-afficher start-overlay en cas d'erreur
+        startOverlay.classList.remove('hidden');
+        uiOverlay.classList.add('hidden');
         const errDiv = document.createElement('div');
         errDiv.style.cssText = 'position:fixed;top:20px;left:16px;right:16px;padding:14px 16px;background:#a85a3b;color:white;border-radius:10px;z-index:99999;font-size:14px;font-family:monospace;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,0.3);';
         errDiv.textContent = 'Erreur : ' + (err.message || err);
