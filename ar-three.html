@@ -37,10 +37,21 @@
 
   <div id="container"></div>
 
-  <!-- Overlay video plein ecran (apparait apres detection avec anim zoom-in) -->
+  <!-- Flash de transition -->
+  <div id="scan-flash" class="scan-flash"></div>
+
+  <!-- Overlay video plein ecran avec frame HUD techno -->
   <div id="video-overlay" class="video-overlay">
     <button id="video-close" class="video-close" aria-label="Fermer">&times;</button>
-    <video id="overlay-video" muted playsinline webkit-playsinline loop></video>
+    <div class="video-frame">
+      <video id="overlay-video" muted playsinline webkit-playsinline loop></video>
+      <span class="corner tl"></span>
+      <span class="corner tr"></span>
+      <span class="corner bl"></span>
+      <span class="corner br"></span>
+      <span class="scan-line"></span>
+      <span class="hud-label">TARGET LOCKED</span>
+    </div>
   </div>
 
   <script type="module">
@@ -88,6 +99,8 @@
         let overlayActive = false;
         let activeCfg = null;
 
+        const scanFlash = document.getElementById('scan-flash');
+
         function openOverlay(cfg) {
           if (overlayActive) return;
           overlayActive = true;
@@ -96,7 +109,15 @@
           overlayVideo.muted = true;
           overlayVideo.loop = true;
           overlayVideo.play().catch(() => {});
-          // attendre 1 frame avant d'ajouter .active pour que la transition CSS demarre
+          // Flash blanc rapide pour marquer la transition
+          scanFlash.classList.remove('active');
+          // forcer reflow pour relancer l'animation si rappelee
+          void scanFlash.offsetWidth;
+          scanFlash.classList.add('active');
+          // Mettre a jour le label HUD
+          document.querySelector('.hud-label').textContent =
+            'TARGET ' + String(cfg.index + 1).padStart(2, '0') + ' / LOCKED';
+          // Demarrer l'overlay 1 frame plus tard pour que la transition CSS s'enclenche
           requestAnimationFrame(() => videoOverlay.classList.add('active'));
         }
         function closeOverlay() {
@@ -261,7 +282,27 @@
       cursor: pointer;
     }
 
-    /* Overlay video plein ecran avec anim zoom-in fluide */
+    /* === FLASH de transition === */
+    .scan-flash {
+      position: fixed;
+      inset: 0;
+      z-index: 1900;
+      background: white;
+      opacity: 0;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+    .scan-flash.active {
+      animation: flashFade 320ms ease-out;
+    }
+    @keyframes flashFade {
+      0%   { opacity: 0; }
+      15%  { opacity: 0.85; }
+      60%  { opacity: 0.4; }
+      100% { opacity: 0; }
+    }
+
+    /* === Overlay video plein ecran (techno) === */
     .video-overlay {
       position: fixed;
       inset: 0;
@@ -273,38 +314,101 @@
       justify-content: center;
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.4s ease-out, background-color 0.5s ease-out, backdrop-filter 0.5s ease-out;
+      transition: opacity 0.35s ease-out, background-color 0.5s ease-out, backdrop-filter 0.5s ease-out;
     }
     .video-overlay.active {
       opacity: 1;
       pointer-events: auto;
-      background: rgba(10, 10, 20, 0.92);
+      background: radial-gradient(ellipse at center, rgba(0, 30, 60, 0.85) 0%, rgba(5, 5, 15, 0.96) 70%);
       backdrop-filter: blur(20px);
     }
-    .video-overlay video {
+
+    /* Cadre + vidéo avec entrée 3D */
+    .video-frame {
+      position: relative;
       max-width: 96vw;
       max-height: 88vh;
-      transform: scale(0.4);
+      transform: perspective(1200px) rotateY(20deg) scale(0.5);
       opacity: 0;
+      filter: drop-shadow(0 0 24px rgba(0, 220, 255, 0.0));
       transition:
-        transform 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-        opacity 0.45s ease-out;
-      border-radius: 14px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+        transform 0.85s cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 0.5s ease-out,
+        filter 0.7s ease-out 0.2s;
+    }
+    .video-overlay.active .video-frame {
+      transform: perspective(1200px) rotateY(0deg) scale(1);
+      opacity: 1;
+      filter: drop-shadow(0 0 24px rgba(0, 220, 255, 0.45));
+    }
+    .video-frame video {
+      display: block;
+      max-width: 96vw;
+      max-height: 88vh;
+      border-radius: 4px;
       background: #000;
     }
-    .video-overlay.active video {
-      transform: scale(1);
-      opacity: 1;
+
+    /* 4 coins HUD style targeting (s'allument apres l'arrivee) */
+    .corner {
+      position: absolute;
+      width: 38px; height: 38px;
+      border: 2px solid #00d4ff;
+      box-shadow: 0 0 14px rgba(0, 212, 255, 0.7);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.4s ease-out 0.55s;
     }
+    .video-overlay.active .corner { opacity: 1; }
+    .corner.tl { top: -10px; left: -10px;  border-right: none; border-bottom: none; }
+    .corner.tr { top: -10px; right: -10px; border-left: none;  border-bottom: none; }
+    .corner.bl { bottom: -10px; left: -10px;  border-right: none; border-top: none; }
+    .corner.br { bottom: -10px; right: -10px; border-left: none;  border-top: none; }
+
+    /* Scan line cyan qui balaye verticalement */
+    .scan-line {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent 5%, #00d4ff 50%, transparent 95%);
+      box-shadow: 0 0 16px #00d4ff, 0 0 4px white;
+      opacity: 0;
+      pointer-events: none;
+      border-radius: 2px;
+    }
+    .video-overlay.active .scan-line {
+      animation: scanDown 1.4s ease-in-out 0.6s 1 forwards;
+    }
+    @keyframes scanDown {
+      0%   { top: 0;    opacity: 0; }
+      10%  { opacity: 0.9; }
+      90%  { opacity: 0.9; }
+      100% { top: calc(100% - 3px); opacity: 0; }
+    }
+
+    /* Label HUD type terminal */
+    .hud-label {
+      position: absolute;
+      top: -32px;
+      left: 0;
+      font-family: ui-monospace, "Courier New", monospace;
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      color: #00d4ff;
+      text-shadow: 0 0 6px rgba(0, 212, 255, 0.7);
+      opacity: 0;
+      transition: opacity 0.4s ease-out 0.7s;
+    }
+    .video-overlay.active .hud-label { opacity: 0.85; }
+
     .video-close {
       position: absolute;
       top: calc(env(safe-area-inset-top, 12px) + 12px);
       right: 16px;
       width: 48px; height: 48px;
       border-radius: 50%;
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(0, 212, 255, 0.12);
+      border: 1px solid rgba(0, 212, 255, 0.35);
       color: white;
       font-size: 1.6rem;
       cursor: pointer;
@@ -313,6 +417,7 @@
       align-items: center;
       justify-content: center;
       backdrop-filter: blur(8px);
+      box-shadow: 0 0 12px rgba(0, 212, 255, 0.3);
     }
   </style>
 
