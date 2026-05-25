@@ -425,29 +425,29 @@
 
     /* === Ecran d'accueil (palette Ardoise + layout A) === */
     #start-overlay {
-      /* Override le fond sombre par defaut de .overlay-screen */
       background: #e8e5e0;
       backdrop-filter: none;
       color: #2c3e50;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: calc(env(safe-area-inset-top, 12px) + 24px) 24px calc(env(safe-area-inset-bottom, 16px) + 140px);
+      justify-content: center; /* centre tout verticalement */
+      padding: calc(env(safe-area-inset-top, 12px) + 24px) 24px calc(env(safe-area-inset-bottom, 16px) + 24px);
       animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow-y: auto;
     }
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(12px); }
       to   { opacity: 1; transform: translateY(0); }
     }
     #start-overlay .hero {
-      flex: 1;
       display: flex;
       flex-direction: column;
-      justify-content: center;
       text-align: center;
       max-width: 440px;
       width: 100%;
       gap: 22px;
+      margin-bottom: 28px; /* espace entre contenu et boutons */
     }
     .start-icon {
       width: 84px; height: 84px;
@@ -487,15 +487,11 @@
       text-decoration: none;
       border-bottom: 1px solid rgba(168, 90, 59, 0.3);
     }
-    /* CTA fixe en bas */
+    /* Bloc CTA dans le flux normal (sous le hero) */
     .start-cta-fixed {
-      position: fixed;
-      left: 0; right: 0;
-      bottom: 0;
-      padding: 18px 24px calc(env(safe-area-inset-bottom, 8px) + 6px);
-      background: linear-gradient(180deg, rgba(232, 229, 224, 0) 0%, rgba(232, 229, 224, 0.96) 35%);
+      width: 100%;
+      max-width: 440px;
       text-align: center;
-      z-index: 1;
     }
     .start-cta {
       width: 100%;
