@@ -54,10 +54,13 @@
 
   <div id="container"></div>
 
-  <!-- Overlay video plein ecran (sobre) -->
+  <!-- Overlay video plein ecran (sobre) + caption -->
   <div id="video-overlay" class="video-overlay">
     <button id="video-close" class="video-close" aria-label="Fermer">&times;</button>
-    <video id="overlay-video" muted playsinline webkit-playsinline loop></video>
+    <div class="video-stack">
+      <video id="overlay-video" muted playsinline webkit-playsinline loop></video>
+      <p id="overlay-caption" class="overlay-caption"></p>
+    </div>
   </div>
 
   <script type="module">
@@ -86,13 +89,23 @@
         const { renderer, scene, camera } = mindar;
 
         // === Configuration des cibles ===
-        // Chaque entree : index = targetIndex dans le .mind, src = video associee
+        // Chaque entree : index = targetIndex, src = video, caption = fichier texte (optionnel)
         const TARGETS = [
-          { index: 0, src: './assets/videos/clip0.mp4' },
-          { index: 1, src: './assets/videos/clip1.mp4' },
-          { index: 2, src: './assets/videos/clip2.mp4' },
-          { index: 3, src: './assets/videos/clip3.mp4' }
+          { index: 0, src: './assets/videos/clip0.mp4', captionUrl: './assets/captions/1.txt' },
+          { index: 1, src: './assets/videos/clip1.mp4', captionUrl: './assets/captions/2.txt' },
+          { index: 2, src: './assets/videos/clip2.mp4', captionUrl: './assets/captions/3.txt' },
+          { index: 3, src: './assets/videos/clip3.mp4', captionUrl: './assets/captions/4.txt' }
         ];
+
+        // Pre-fetch des captions en arriere-plan
+        const captionsCache = new Map();
+        for (const cfg of TARGETS) {
+          if (!cfg.captionUrl) continue;
+          fetch(cfg.captionUrl)
+            .then(r => r.ok ? r.text() : '')
+            .then(text => captionsCache.set(cfg.index, text.trim()))
+            .catch(() => {});
+        }
 
         const OVERSIZE = 1.05;
         const POP_DURATION = 350; // ms : anim apparition vidéo plaquée
@@ -105,6 +118,8 @@
         let overlayActive = false;
         let activeCfg = null;
 
+        const overlayCaption = document.getElementById('overlay-caption');
+
         function openOverlay(cfg) {
           if (overlayActive) return;
           overlayActive = true;
@@ -112,9 +127,10 @@
           overlayVideo.src = cfg.src;
           overlayVideo.muted = true;
           overlayVideo.loop = true;
-          // Forcer le debut de la video
           overlayVideo.currentTime = 0;
           overlayVideo.play().catch(() => {});
+          // Mettre a jour la legende
+          overlayCaption.textContent = captionsCache.get(cfg.index) || '';
           requestAnimationFrame(() => videoOverlay.classList.add('active'));
         }
         function closeOverlay() {
@@ -460,9 +476,20 @@
       background: rgba(10, 10, 20, 0.92);
       backdrop-filter: blur(18px);
     }
-    .video-overlay video {
+    .video-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
       max-width: 96vw;
-      max-height: 88vh;
+      max-height: 90vh;
+      padding: calc(env(safe-area-inset-top, 12px) + 56px) 0 calc(env(safe-area-inset-bottom, 12px) + 16px);
+      box-sizing: border-box;
+    }
+    .video-overlay video {
+      width: 100%;
+      max-width: 96vw;
+      max-height: 50vh;
       transform: scale(0.5);
       opacity: 0;
       transition:
@@ -475,6 +502,26 @@
     .video-overlay.active video {
       transform: scale(1);
       opacity: 1;
+    }
+    .overlay-caption {
+      margin: 0;
+      padding: 0 14px;
+      max-width: 540px;
+      font-size: 0.95rem;
+      line-height: 1.55;
+      color: rgba(255, 255, 255, 0.88);
+      text-align: justify;
+      hyphens: auto;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.5s ease-out 0.25s, transform 0.5s ease-out 0.25s;
+      overflow-y: auto;
+      max-height: 32vh;
+    }
+    .overlay-caption:empty { display: none; }
+    .video-overlay.active .overlay-caption {
+      opacity: 1;
+      transform: translateY(0);
     }
     .video-close {
       position: absolute;
