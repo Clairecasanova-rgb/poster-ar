@@ -37,6 +37,12 @@
 
   <div id="container"></div>
 
+  <!-- Overlay video plein ecran (apparait apres detection avec anim zoom-in) -->
+  <div id="video-overlay" class="video-overlay">
+    <button id="video-close" class="video-close" aria-label="Fermer">&times;</button>
+    <video id="overlay-video" muted playsinline webkit-playsinline loop></video>
+  </div>
+
   <script type="module">
     import * as THREE from 'three';
     import { MindARThree } from 'mindar-image-three';
@@ -71,8 +77,39 @@
           { index: 3, src: './assets/videos/clip3.mp4' }
         ];
 
-        const OVERSIZE = 1.05; // sur-dimensionnement du plane (compense tracking)
+        const OVERSIZE = 1.05;
+        const POP_DURATION = 350; // ms : anim apparition vidéo plaquée
+        const OVERLAY_DELAY = 900; // ms : delai avant ouverture overlay plein ecran
         const scanFrame = document.getElementById('scan-frame');
+        const videoOverlay = document.getElementById('video-overlay');
+        const overlayVideo = document.getElementById('overlay-video');
+        const overlayClose = document.getElementById('video-close');
+
+        let overlayActive = false;
+        let activeCfg = null;
+
+        function openOverlay(cfg) {
+          if (overlayActive) return;
+          overlayActive = true;
+          activeCfg = cfg;
+          overlayVideo.src = cfg.src;
+          overlayVideo.muted = true;
+          overlayVideo.loop = true;
+          overlayVideo.play().catch(() => {});
+          // attendre 1 frame avant d'ajouter .active pour que la transition CSS demarre
+          requestAnimationFrame(() => videoOverlay.classList.add('active'));
+        }
+        function closeOverlay() {
+          videoOverlay.classList.remove('active');
+          overlayVideo.pause();
+          setTimeout(() => {
+            overlayVideo.removeAttribute('src');
+            overlayVideo.load();
+            overlayActive = false;
+            activeCfg = null;
+          }, 500);
+        }
+        overlayClose.addEventListener('click', closeOverlay);
 
         // Cree un overlay video pour chaque cible
         for (const cfg of TARGETS) {
@@ -124,16 +161,41 @@
             texture.needsUpdate = true;
           }
 
+          let pendingOverlayTimer = null;
+
           anchor.onTargetFound = () => {
+            if (overlayActive) return; // un overlay deja affiche, on ignore
             hint.classList.add('hidden');
             scanFrame.classList.add('hidden');
             applyFit();
+
+            // 1. Anim pop-in de la video plaquee
+            const startTime = performance.now();
+            const baseScale = plane.scale.clone();
+            function popAnim(now) {
+              const t = Math.min(1, (now - startTime) / POP_DURATION);
+              // ease out cubic
+              const eased = 1 - Math.pow(1 - t, 3);
+              const s = eased; // 0 -> 1
+              plane.scale.set(baseScale.x * s, baseScale.y * s, baseScale.z * s);
+              if (t < 1) requestAnimationFrame(popAnim);
+            }
+            requestAnimationFrame(popAnim);
+
             videoEl.play().catch(e => console.warn('video play blocked', cfg.index, e));
+
+            // 2. Apres delai, ouvrir overlay plein ecran (effet "approche")
+            clearTimeout(pendingOverlayTimer);
+            pendingOverlayTimer = setTimeout(() => openOverlay(cfg), OVERLAY_DELAY);
           };
           anchor.onTargetLost = () => {
-            hint.classList.remove('hidden');
-            scanFrame.classList.remove('hidden');
-            videoEl.pause();
+            // si pas encore overlay ouvert, on annule
+            clearTimeout(pendingOverlayTimer);
+            if (!overlayActive) {
+              hint.classList.remove('hidden');
+              scanFrame.classList.remove('hidden');
+              videoEl.pause();
+            }
           };
         }
 
@@ -197,6 +259,60 @@
       pointer-events: auto;
       font-size: 1.2rem;
       cursor: pointer;
+    }
+
+    /* Overlay video plein ecran avec anim zoom-in fluide */
+    .video-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: rgba(0, 0, 0, 0);
+      backdrop-filter: blur(0px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease-out, background-color 0.5s ease-out, backdrop-filter 0.5s ease-out;
+    }
+    .video-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+      background: rgba(10, 10, 20, 0.92);
+      backdrop-filter: blur(20px);
+    }
+    .video-overlay video {
+      max-width: 96vw;
+      max-height: 88vh;
+      transform: scale(0.4);
+      opacity: 0;
+      transition:
+        transform 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 0.45s ease-out;
+      border-radius: 14px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      background: #000;
+    }
+    .video-overlay.active video {
+      transform: scale(1);
+      opacity: 1;
+    }
+    .video-close {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 12px) + 12px);
+      right: 16px;
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.18);
+      color: white;
+      font-size: 1.6rem;
+      cursor: pointer;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
     }
   </style>
 
