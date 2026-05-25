@@ -63,13 +63,35 @@
         const { renderer, scene, camera } = mindar;
         const anchor = mindar.addAnchor(0);
 
-        // Photo plaquee : texture locale + auto-fit "cover" sur la cible
-        const loader = new THREE.TextureLoader();
+        // Video plaquee : VideoTexture + auto-fit "cover" sur la cible
+        const videoEl = document.createElement('video');
+        videoEl.src = './assets/videos/clip1.mp4';
+        videoEl.muted = true;
+        videoEl.loop = true;
+        videoEl.playsInline = true;
+        videoEl.setAttribute('playsinline', '');
+        videoEl.setAttribute('webkit-playsinline', '');
+        videoEl.crossOrigin = 'anonymous';
+        videoEl.preload = 'auto';
+        videoEl.style.display = 'none';
+        document.body.appendChild(videoEl);
+
         let textureLoaded = false;
-        const texture = loader.load('./assets/images/placeholder.jpg', () => {
+        const texture = new THREE.VideoTexture(videoEl);
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.format = THREE.RGBAFormat;
+
+        // texture.image pour VideoTexture est l'element <video> -- on attend les metadata
+        videoEl.addEventListener('loadedmetadata', () => {
           textureLoaded = true;
           applyFit();
         });
+        // Fallback si la video est deja en cache
+        if (videoEl.readyState >= 1) {
+          textureLoaded = true;
+          applyFit();
+        }
 
         // PlaneGeometry(1, 1) ; on scalera Y au ratio de la cible une fois detectee
         const geometry = new THREE.PlaneGeometry(1, 1);
@@ -87,10 +109,13 @@
           if (!textureLoaded || targetRatio === null) return;
           // 1. Ajuster le plane au ratio cible + leger sur-dimensionnement
           plane.scale.set(OVERSIZE, OVERSIZE * targetRatio, OVERSIZE);
-          // 2. Calculer UV "cover" pour cropper la photo (pas de deformation)
+          // 2. Calculer UV "cover" pour cropper sans deformer
           const tgtAspect = 1 / targetRatio; // largeur/hauteur cible
-          const img = texture.image;
-          const photoAspect = img.width / img.height;
+          // VideoTexture : utiliser videoWidth/videoHeight (pas width/height)
+          const sourceEl = texture.image;
+          const srcW = sourceEl.videoWidth || sourceEl.width;
+          const srcH = sourceEl.videoHeight || sourceEl.height;
+          const photoAspect = srcW / srcH;
           if (photoAspect > tgtAspect) {
             // Photo + paysage que la cible : crop gauche/droite
             const r = tgtAspect / photoAspect;
@@ -119,10 +144,13 @@
               applyFit();
             }
           }
+          // Lancer la lecture video
+          videoEl.play().catch(e => console.warn('video play blocked', e));
         };
         anchor.onTargetLost = () => {
           hint.classList.remove('hidden');
           scanFrame.classList.remove('hidden');
+          videoEl.pause();
         };
 
         await mindar.start();
