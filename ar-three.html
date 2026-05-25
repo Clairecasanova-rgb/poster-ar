@@ -109,40 +109,25 @@
           const plane = new THREE.Mesh(geometry, material);
           anchor.group.add(plane);
 
-          let targetRatio = null;
-
+          // Plane scale au ratio de la VIDEO (pas de la cible) -> respecte format video natif
           function applyFit() {
-            if (!textureLoaded || targetRatio === null) return;
-            plane.scale.set(OVERSIZE, OVERSIZE * targetRatio, OVERSIZE);
-            const tgtAspect = 1 / targetRatio;
+            if (!textureLoaded) return;
             const srcW = videoEl.videoWidth;
             const srcH = videoEl.videoHeight;
             if (!srcW || !srcH) return;
-            const photoAspect = srcW / srcH;
-            if (photoAspect > tgtAspect) {
-              const r = tgtAspect / photoAspect;
-              texture.repeat.set(r, 1);
-              texture.offset.set((1 - r) / 2, 0);
-            } else {
-              const r = photoAspect / tgtAspect;
-              texture.repeat.set(1, r);
-              texture.offset.set(0, (1 - r) / 2);
-            }
+            const videoRatio = srcH / srcW;
+            // Plane plein largeur de la cible (1), hauteur = ratio video
+            plane.scale.set(OVERSIZE, OVERSIZE * videoRatio, OVERSIZE);
+            // Pas de UV crop : la video est rendue en entier (sans deformation)
+            texture.repeat.set(1, 1);
+            texture.offset.set(0, 0);
             texture.needsUpdate = true;
           }
 
           anchor.onTargetFound = () => {
             hint.classList.add('hidden');
             scanFrame.classList.add('hidden');
-            if (targetRatio === null) {
-              const m = anchor.group.matrix.elements;
-              const sx = Math.sqrt(m[0]*m[0] + m[1]*m[1] + m[2]*m[2]);
-              const sy = Math.sqrt(m[4]*m[4] + m[5]*m[5] + m[6]*m[6]);
-              if (sx > 0 && sy > 0) {
-                targetRatio = sy / sx;
-                applyFit();
-              }
-            }
+            applyFit();
             videoEl.play().catch(e => console.warn('video play blocked', cfg.index, e));
           };
           anchor.onTargetLost = () => {
