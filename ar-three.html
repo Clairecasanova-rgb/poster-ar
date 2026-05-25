@@ -29,8 +29,8 @@
             <rect x="8" y="9" width="8" height="6" rx="1"/>
           </svg>
         </div>
-        <h1 class="start-title">Titre du projet</h1>
-        <p class="start-subtitle">Sous-titre court &mdash; presentez ici le contenu en une phrase.</p>
+        <h1 class="start-title">Identifier, mesurer, comparer</h1>
+        <p class="start-subtitle">L&rsquo;apport du num&eacute;rique pour la caract&eacute;risation des gravures rupestres</p>
       </header>
 
       <ol class="steps">
@@ -49,8 +49,15 @@
     </div>
 
     <footer class="start-footer">
-      <span class="footer-left">Auteur &middot; Affiliation</span>
-      <span class="footer-right">2026</span>
+      <p class="footer-author">
+        <strong>Claire CASANOVA</strong> &mdash; Doctorante 3<sup>e</sup> ann&eacute;e
+        &middot; <a href="mailto:casanova_c@univ-corse.fr">casanova_c@univ-corse.fr</a>
+      </p>
+      <p class="footer-direction">
+        Direction&nbsp;: <strong>Pr Tony FOGACCI</strong> &amp; <strong>Dr Antonia COLONNA</strong>
+        &bull; UMR CNRS 6240 LISA &middot; ICPP
+        &bull; 4200030 &mdash; Cultures et Langues R&eacute;gionales &mdash; 73<sup>e</sup> CNU
+      </p>
     </footer>
   </div>
 
@@ -436,15 +443,28 @@
     }
     .start-footer {
       width: 100%;
-      max-width: 440px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
+      max-width: 520px;
       padding-top: 24px;
+      text-align: center;
       font-size: 0.72rem;
-      letter-spacing: 0.05em;
-      opacity: 0.4;
-      text-transform: uppercase;
+      line-height: 1.55;
+      opacity: 0.6;
+    }
+    .start-footer p {
+      margin: 0 0 4px;
+    }
+    .start-footer strong {
+      color: rgba(255, 255, 255, 0.9);
+      font-weight: 600;
+    }
+    .start-footer a {
+      color: inherit;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+    }
+    .footer-direction {
+      opacity: 0.85;
+      font-size: 0.68rem;
     }
 
     /* === Overlay video plein ecran (sobre) === */
