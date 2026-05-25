@@ -95,6 +95,8 @@
           overlayVideo.src = cfg.src;
           overlayVideo.muted = true;
           overlayVideo.loop = true;
+          // Forcer le debut de la video
+          overlayVideo.currentTime = 0;
           overlayVideo.play().catch(() => {});
           requestAnimationFrame(() => videoOverlay.classList.add('active'));
         }
@@ -235,6 +237,8 @@
             }
             requestAnimationFrame(fadeAnim);
 
+            // Toujours redemarrer la video au debut pour ne pas spoiler
+            try { videoEl.currentTime = 0; } catch (e) {}
             videoEl.play().catch(e => console.warn('video play blocked', cfg.index, e));
 
             // Phase 3 : ouverture overlay plein ecran apres delai global
@@ -247,6 +251,7 @@
               hint.classList.remove('hidden');
               scanFrame.classList.remove('hidden');
               videoEl.pause();
+              try { videoEl.currentTime = 0; } catch (e) {}
               // Reset visuel (cadre + video) pour re-anim a la prochaine detection
               lineTop.scale.x = 0;
               lineRight.scale.y = 0;
