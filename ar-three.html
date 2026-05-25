@@ -20,12 +20,38 @@
 <body class="ar">
 
   <div id="start-overlay" class="overlay-screen">
-    <div class="card">
-      <h2>AR plaque</h2>
-      <p>Pointe vers l'image cible apres avoir active la camera.</p>
-      <button id="start-btn" class="btn primary">Activer la camera</button>
-      <a href="ar.html" class="btn-link">Fallback HTML overlay</a>
+    <div class="start-content">
+
+      <header class="start-header">
+        <div class="start-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3"/>
+            <rect x="8" y="9" width="8" height="6" rx="1"/>
+          </svg>
+        </div>
+        <h1 class="start-title">Titre du projet</h1>
+        <p class="start-subtitle">Sous-titre court &mdash; presentez ici le contenu en une phrase.</p>
+      </header>
+
+      <ol class="steps">
+        <li><span class="step-num">1</span><span>Activez la camera</span></li>
+        <li><span class="step-num">2</span><span>Pointez une image du poster</span></li>
+        <li><span class="step-num">3</span><span>Decouvrez le contenu en realite augmentee</span></li>
+      </ol>
+
+      <button id="start-btn" class="btn primary start-cta">Activer la camera</button>
+
+      <p class="start-tip">
+        Safari sur iPhone ou Chrome sur Android.<br>
+        Privilegiez un eclairage uniforme et tenez le telephone a 20&ndash;30 cm de l'image.
+      </p>
+
     </div>
+
+    <footer class="start-footer">
+      <span class="footer-left">Auteur &middot; Affiliation</span>
+      <span class="footer-right">2026</span>
+    </footer>
   </div>
 
   <div id="ui-overlay" class="hidden">
@@ -322,6 +348,103 @@
       pointer-events: auto;
       font-size: 1.2rem;
       cursor: pointer;
+    }
+
+    /* === Ecran d'accueil (avant camera) === */
+    #start-overlay {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: calc(env(safe-area-inset-top, 12px) + 32px) 20px calc(env(safe-area-inset-bottom, 12px) + 20px);
+    }
+    .start-content {
+      width: 100%;
+      max-width: 440px;
+      text-align: center;
+      margin: auto 0;
+      animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .start-header { margin-bottom: 32px; }
+    .start-icon {
+      width: 64px; height: 64px;
+      margin: 0 auto 22px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(255, 255, 255, 0.9);
+    }
+    .start-icon svg { width: 32px; height: 32px; }
+    .start-title {
+      margin: 0 0 8px;
+      font-size: 1.6rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+    }
+    .start-subtitle {
+      margin: 0;
+      font-size: 0.95rem;
+      opacity: 0.65;
+      line-height: 1.5;
+    }
+    .steps {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 28px;
+      display: flex; flex-direction: column; gap: 10px;
+      text-align: left;
+    }
+    .steps li {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      font-size: 0.94rem;
+      line-height: 1.4;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.95);
+      font-variant-numeric: tabular-nums;
+    }
+    .start-cta {
+      width: 100%;
+      padding: 16px 24px;
+      font-size: 1.05rem;
+      margin: 0;
+    }
+    .start-tip {
+      margin: 18px 0 0;
+      font-size: 0.8rem;
+      line-height: 1.55;
+      opacity: 0.55;
+    }
+    .start-footer {
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 24px;
+      font-size: 0.72rem;
+      letter-spacing: 0.05em;
+      opacity: 0.4;
+      text-transform: uppercase;
     }
 
     /* === Overlay video plein ecran (sobre) === */
