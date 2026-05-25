@@ -41,8 +41,50 @@
 
     <div class="start-cta-fixed">
       <button id="start-btn" class="start-cta">Activer la cam&eacute;ra</button>
+      <button id="temoigner-btn" class="start-secondary">Partager un t&eacute;moignage</button>
       <p class="start-tip">Safari sur iPhone &middot; Chrome sur Android</p>
     </div>
+  </div>
+
+  <!-- Modal formulaire de témoignage -->
+  <div id="form-overlay" class="form-overlay">
+    <button id="form-close" class="form-close" aria-label="Fermer">&times;</button>
+    <div class="form-content">
+      <h2 class="form-title">Partager un t&eacute;moignage</h2>
+      <p class="form-intro">
+        Une l&eacute;gende, une anecdote, une information sur les gravures rupestres
+        ou les lieux du t&eacute;moignage&nbsp;? Votre contribution est pr&eacute;cieuse.
+      </p>
+      <form action="https://formsubmit.co/casanova_c@univ-corse.fr" method="POST" class="temoignage-form">
+        <label class="form-field">
+          <span class="form-label">Nom <span class="form-opt">(optionnel)</span></span>
+          <input type="text" name="nom" autocomplete="name">
+        </label>
+        <label class="form-field">
+          <span class="form-label">Email <span class="form-req">*</span></span>
+          <input type="email" name="email" required autocomplete="email">
+        </label>
+        <label class="form-field">
+          <span class="form-label">Lieu <span class="form-opt">(commune, microtoponyme)</span></span>
+          <input type="text" name="lieu">
+        </label>
+        <label class="form-field">
+          <span class="form-label">T&eacute;moignage <span class="form-req">*</span></span>
+          <textarea name="temoignage" rows="6" required></textarea>
+        </label>
+        <input type="hidden" name="_subject" value="Temoignage - gravures rupestres">
+        <input type="hidden" name="_captcha" value="false">
+        <input type="hidden" name="_template" value="table">
+        <input type="hidden" name="_next" value="https://clairecasanova-rgb.github.io/poster-ar/?merci=1">
+        <button type="submit" class="form-submit">Envoyer le t&eacute;moignage</button>
+        <p class="form-note">Vos donn&eacute;es ne sont utilis&eacute;es que pour ce travail de recherche.</p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast de remerciement (apparait si URL contient ?merci=1) -->
+  <div id="merci-toast" class="merci-toast">
+    Merci pour votre t&eacute;moignage&nbsp;!
   </div>
 
   <div id="ui-overlay" class="hidden">
@@ -62,6 +104,24 @@
       <p id="overlay-caption" class="overlay-caption"></p>
     </div>
   </div>
+
+  <!-- Gestion modal formulaire (script classique, ne depend pas de MindAR) -->
+  <script>
+    (function() {
+      const formOverlay = document.getElementById('form-overlay');
+      const formBtn = document.getElementById('temoigner-btn');
+      const formClose = document.getElementById('form-close');
+      formBtn?.addEventListener('click', () => formOverlay.classList.add('active'));
+      formClose?.addEventListener('click', () => formOverlay.classList.remove('active'));
+
+      // Toast de remerciement si retour de soumission (?merci=1)
+      if (new URLSearchParams(location.search).get('merci') === '1') {
+        const toast = document.getElementById('merci-toast');
+        setTimeout(() => toast.classList.add('visible'), 200);
+        setTimeout(() => toast.classList.remove('visible'), 4500);
+      }
+    })();
+  </script>
 
   <script type="module">
     import * as THREE from 'three';
@@ -454,6 +514,165 @@
       margin: 12px 0 0;
       font-size: 0.78rem;
       color: rgba(44, 62, 80, 0.55);
+    }
+    /* Bouton secondaire "Témoigner" sous le CTA principal */
+    .start-secondary {
+      display: block;
+      margin: 10px auto 0;
+      padding: 12px 22px;
+      background: transparent;
+      color: #a85a3b;
+      border: 1px solid rgba(168, 90, 59, 0.4);
+      border-radius: 999px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      max-width: 360px;
+      width: 100%;
+    }
+    .start-secondary:active { transform: translateY(1px); }
+
+    /* === Modal Formulaire témoignage === */
+    .form-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2500;
+      background: rgba(232, 229, 224, 0.98);
+      backdrop-filter: blur(8px);
+      color: #2c3e50;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(20px);
+      transition: opacity 0.35s ease-out, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow-y: auto;
+      padding: calc(env(safe-area-inset-top, 12px) + 60px) 20px calc(env(safe-area-inset-bottom, 16px) + 24px);
+    }
+    .form-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+    .form-close {
+      position: fixed;
+      top: calc(env(safe-area-inset-top, 12px) + 12px);
+      right: 16px;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: rgba(44, 62, 80, 0.08);
+      border: 1px solid rgba(44, 62, 80, 0.15);
+      color: #2c3e50;
+      font-size: 1.5rem;
+      cursor: pointer;
+      z-index: 10;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .form-content {
+      max-width: 540px;
+      margin: 0 auto;
+    }
+    .form-title {
+      margin: 0 0 12px;
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: #2c3e50;
+    }
+    .form-intro {
+      margin: 0 0 26px;
+      font-size: 0.95rem;
+      line-height: 1.55;
+      color: rgba(44, 62, 80, 0.75);
+    }
+    .temoignage-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: rgba(44, 62, 80, 0.8);
+    }
+    .form-opt {
+      font-weight: 400;
+      opacity: 0.6;
+      font-size: 0.78rem;
+    }
+    .form-req {
+      color: #a85a3b;
+    }
+    .temoignage-form input,
+    .temoignage-form textarea {
+      width: 100%;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.6);
+      border: 1px solid rgba(44, 62, 80, 0.18);
+      border-radius: 10px;
+      color: #2c3e50;
+      font: inherit;
+      font-size: 1rem;
+      font-family: inherit;
+      box-sizing: border-box;
+      -webkit-appearance: none;
+    }
+    .temoignage-form input:focus,
+    .temoignage-form textarea:focus {
+      outline: none;
+      border-color: #a85a3b;
+      background: white;
+    }
+    .temoignage-form textarea {
+      resize: vertical;
+      min-height: 120px;
+      line-height: 1.5;
+    }
+    .form-submit {
+      margin-top: 8px;
+      padding: 16px 24px;
+      background: linear-gradient(135deg, #2c3e50 0%, #1a2733 100%);
+      color: white;
+      border: none;
+      border-radius: 999px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      box-shadow: 0 6px 18px rgba(44, 62, 80, 0.25);
+    }
+    .form-submit:active { transform: translateY(1px); }
+    .form-note {
+      margin: 8px 0 0;
+      font-size: 0.75rem;
+      color: rgba(44, 62, 80, 0.55);
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    /* Toast de remerciement apres soumission */
+    .merci-toast {
+      position: fixed;
+      top: calc(env(safe-area-inset-top, 16px) + 16px);
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      padding: 14px 22px;
+      background: #2c3e50;
+      color: white;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      z-index: 9999;
+      opacity: 0;
+      transition: opacity 0.4s, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+    .merci-toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
     }
 
     /* === Overlay video plein ecran (sobre) === */
