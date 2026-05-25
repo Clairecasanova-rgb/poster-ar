@@ -2,35 +2,494 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-  <meta name="theme-color" content="#1a1a2e">
-  <title>Poster AR — Expérience interactive</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, maximum-scale=1">
+  <meta name="theme-color" content="#000000">
+  <title>Poster AR (Three.js)</title>
   <link rel="stylesheet" href="css/ui.css">
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.147.0/examples/jsm/",
+        "mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+      }
+    }
+  </script>
 </head>
-<body class="landing">
-  <main class="landing-main">
-    <h1>Poster AR</h1>
-    <p class="lead">
-      Pointez la caméra de votre téléphone vers les images du poster
-      pour découvrir le contenu interactif.
-    </p>
+<body class="ar">
 
-    <a href="ar.html" class="btn primary">Démarrer l'expérience</a>
+  <div id="start-overlay" class="overlay-screen">
+    <div class="hero">
+      <div class="start-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7V4h3M21 7V4h-3M3 17v3h3M21 17v3h-3"/>
+          <rect x="8" y="9" width="8" height="6" rx="1"/>
+        </svg>
+      </div>
+      <h1 class="start-title">Identifier, mesurer, comparer</h1>
+      <p class="start-subtitle">L&rsquo;apport du num&eacute;rique pour la caract&eacute;risation des gravures rupestres</p>
 
-    <details class="help">
-      <summary>Compatibilité &amp; conseils</summary>
-      <ul>
-        <li><strong>iPhone</strong> : ouvrez ce lien dans <em>Safari</em> (Chrome iOS ne fonctionne pas).</li>
-        <li><strong>Android</strong> : Chrome recommandé.</li>
-        <li>Autorisez l'accès à la caméra lorsque le navigateur le demande.</li>
-        <li>Éclairage suffisant et image bien à plat pour une bonne détection.</li>
-        <li>Tenez le téléphone à 20–40 cm de l'image.</li>
-      </ul>
-    </details>
+      <div class="start-author">
+        <strong>Claire CASANOVA</strong> &mdash; Doctorante 3<sup>e</sup> ann&eacute;e<br>
+        <a href="mailto:casanova_c@univ-corse.fr">casanova_c@univ-corse.fr</a><br>
+        <br>
+        Direction&nbsp;: <strong>Pr Tony FOGACCI</strong> &amp; <strong>Dr Antonia COLONNA</strong><br>
+        UMR CNRS 6240 LISA &middot; ICPP
+      </div>
+    </div>
 
-    <footer class="footer">
-      <a href="qr.html">Générer le QR code à imprimer</a>
-    </footer>
-  </main>
+    <div class="start-cta-fixed">
+      <button id="start-btn" class="start-cta">Activer la cam&eacute;ra</button>
+      <p class="start-tip">Safari sur iPhone &middot; Chrome sur Android</p>
+    </div>
+  </div>
+
+  <div id="ui-overlay" class="hidden">
+    <a href="index.html" class="btn-icon back" aria-label="Retour">&larr;</a>
+    <button id="cam-toggle" class="cam-toggle" aria-label="Mode camera" title="Basculer vue camera (plein / complete)">&#x21F2;</button>
+    <div id="hint" class="hint">Pointez vers une image du poster</div>
+    <div id="scan-frame" class="scan-frame"><span></span></div>
+  </div>
+
+  <div id="container"></div>
+
+  <!-- Overlay video plein ecran (sobre) -->
+  <div id="video-overlay" class="video-overlay">
+    <button id="video-close" class="video-close" aria-label="Fermer">&times;</button>
+    <video id="overlay-video" muted playsinline webkit-playsinline loop></video>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { MindARThree } from 'mindar-image-three';
+
+    const startOverlay = document.getElementById('start-overlay');
+    const startBtn = document.getElementById('start-btn');
+    const uiOverlay = document.getElementById('ui-overlay');
+    const hint = document.getElementById('hint');
+
+    startBtn.addEventListener('click', async () => {
+      startBtn.disabled = true;
+      startBtn.textContent = 'Chargement...';
+      try {
+        const mindar = new MindARThree({
+          container: document.getElementById('container'),
+          imageTargetSrc: './assets/targets.mind',
+          uiLoading: 'no', uiScanning: 'no', uiError: 'no',
+          // Lissage du tracking : valeurs PLUS PETITES = plus stable (filtre OneEuro)
+          filterMinCF: 0.00001,
+          filterBeta: 0.0001,
+          missTolerance: 10,    // tolere 10 frames manquees avant 'lost'
+          warmupTolerance: 5    // confirme detection sur 5 frames avant declaration
+        });
+        const { renderer, scene, camera } = mindar;
+
+        // === Configuration des cibles ===
+        // Chaque entree : index = targetIndex dans le .mind, src = video associee
+        const TARGETS = [
+          { index: 0, src: './assets/videos/clip0.mp4' },
+          { index: 1, src: './assets/videos/clip1.mp4' },
+          { index: 2, src: './assets/videos/clip2.mp4' },
+          { index: 3, src: './assets/videos/clip3.mp4' }
+        ];
+
+        const OVERSIZE = 1.05;
+        const POP_DURATION = 350; // ms : anim apparition vidéo plaquée
+        const OVERLAY_DELAY = 900; // ms : delai avant ouverture overlay plein ecran
+        const scanFrame = document.getElementById('scan-frame');
+        const videoOverlay = document.getElementById('video-overlay');
+        const overlayVideo = document.getElementById('overlay-video');
+        const overlayClose = document.getElementById('video-close');
+
+        let overlayActive = false;
+        let activeCfg = null;
+
+        function openOverlay(cfg) {
+          if (overlayActive) return;
+          overlayActive = true;
+          activeCfg = cfg;
+          overlayVideo.src = cfg.src;
+          overlayVideo.muted = true;
+          overlayVideo.loop = true;
+          // Forcer le debut de la video
+          overlayVideo.currentTime = 0;
+          overlayVideo.play().catch(() => {});
+          requestAnimationFrame(() => videoOverlay.classList.add('active'));
+        }
+        function closeOverlay() {
+          videoOverlay.classList.remove('active');
+          overlayVideo.pause();
+          setTimeout(() => {
+            overlayVideo.removeAttribute('src');
+            overlayVideo.load();
+            overlayActive = false;
+            activeCfg = null;
+          }, 500);
+        }
+        overlayClose.addEventListener('click', closeOverlay);
+
+        // Cree un overlay video pour chaque cible
+        for (const cfg of TARGETS) {
+          const anchor = mindar.addAnchor(cfg.index);
+
+          const videoEl = document.createElement('video');
+          videoEl.src = cfg.src;
+          videoEl.muted = true;
+          videoEl.loop = true;
+          videoEl.playsInline = true;
+          videoEl.setAttribute('playsinline', '');
+          videoEl.setAttribute('webkit-playsinline', '');
+          videoEl.crossOrigin = 'anonymous';
+          videoEl.preload = 'auto';
+          videoEl.style.display = 'none';
+          document.body.appendChild(videoEl);
+
+          let textureLoaded = false;
+          const texture = new THREE.VideoTexture(videoEl);
+          texture.minFilter = THREE.LinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+          texture.format = THREE.RGBAFormat;
+
+          videoEl.addEventListener('loadedmetadata', () => {
+            textureLoaded = true;
+            applyFit();
+          });
+          if (videoEl.readyState >= 1) {
+            textureLoaded = true;
+          }
+
+          const geometry = new THREE.PlaneGeometry(1, 1);
+          const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0 });
+          const plane = new THREE.Mesh(geometry, material);
+          anchor.group.add(plane);
+
+          // Cadre fin blanc qui se trace progressivement autour de la cible
+          // (style "calibration" sobre)
+          const frame = new THREE.Group();
+          const LW = 0.012; // epaisseur des lignes
+          const lineMatTpl = { color: 0xffffff, transparent: true, opacity: 0.85, depthTest: false };
+          // top : pivot a gauche, geometry centree puis translatee
+          const mkLine = (orientation) => {
+            const isH = orientation === 'top' || orientation === 'bot';
+            const g = isH ? new THREE.PlaneGeometry(1, LW) : new THREE.PlaneGeometry(LW, 1);
+            // Pivot a une extremite pour anim de tracage
+            if (orientation === 'top')   g.translate(0.5, 0, 0);    // pivot gauche
+            if (orientation === 'right') g.translate(0, -0.5, 0);   // pivot haut
+            if (orientation === 'bot')   g.translate(-0.5, 0, 0);   // pivot droite
+            if (orientation === 'left')  g.translate(0, 0.5, 0);    // pivot bas
+            const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial(lineMatTpl));
+            return m;
+          };
+          const lineTop   = mkLine('top');   lineTop.position.set(-0.5,  0.5, 0.001);
+          const lineRight = mkLine('right'); lineRight.position.set( 0.5,  0.5, 0.001);
+          const lineBot   = mkLine('bot');   lineBot.position.set( 0.5, -0.5, 0.001);
+          const lineLeft  = mkLine('left');  lineLeft.position.set(-0.5, -0.5, 0.001);
+          [lineTop, lineRight, lineBot, lineLeft].forEach(l => frame.add(l));
+          // Initialement invisible (scale 0 sur l'axe "tracage")
+          lineTop.scale.x = 0;
+          lineRight.scale.y = 0;
+          lineBot.scale.x = 0;
+          lineLeft.scale.y = 0;
+          anchor.group.add(frame);
+
+          // Plane scale au ratio de la VIDEO (pas de la cible) -> respecte format video natif
+          function applyFit() {
+            if (!textureLoaded) return;
+            const srcW = videoEl.videoWidth;
+            const srcH = videoEl.videoHeight;
+            if (!srcW || !srcH) return;
+            const videoRatio = srcH / srcW;
+            // Plane plein largeur de la cible (1), hauteur = ratio video
+            plane.scale.set(OVERSIZE, OVERSIZE * videoRatio, OVERSIZE);
+            // Frame suit la meme taille que le plane (cadre AUTOUR de la video)
+            frame.scale.set(OVERSIZE, OVERSIZE * videoRatio, OVERSIZE);
+            texture.repeat.set(1, 1);
+            texture.offset.set(0, 0);
+            texture.needsUpdate = true;
+          }
+
+          let pendingOverlayTimer = null;
+
+          anchor.onTargetFound = () => {
+            if (overlayActive) return;
+            hint.classList.add('hidden');
+            scanFrame.classList.add('hidden');
+            applyFit();
+
+            // Phase 1 : tracage progressif du cadre (4 segments en sequence)
+            // Top -> Right -> Bot -> Left, ~150ms par segment
+            const SEG_DURATION = 150;
+            const FRAME_DURATION = SEG_DURATION * 4; // ~600ms total
+            const startTime = performance.now();
+
+            function frameAnim(now) {
+              const elapsed = now - startTime;
+              const t0 = Math.min(1, Math.max(0, elapsed / SEG_DURATION));
+              const t1 = Math.min(1, Math.max(0, (elapsed - SEG_DURATION) / SEG_DURATION));
+              const t2 = Math.min(1, Math.max(0, (elapsed - SEG_DURATION * 2) / SEG_DURATION));
+              const t3 = Math.min(1, Math.max(0, (elapsed - SEG_DURATION * 3) / SEG_DURATION));
+              const ease = (x) => 1 - Math.pow(1 - x, 2); // ease-out quad
+              lineTop.scale.x   = ease(t0);
+              lineRight.scale.y = ease(t1);
+              lineBot.scale.x   = ease(t2);
+              lineLeft.scale.y  = ease(t3);
+              if (elapsed < FRAME_DURATION) requestAnimationFrame(frameAnim);
+            }
+            requestAnimationFrame(frameAnim);
+
+            // Phase 2 : fade-in de la video (apres que le cadre soit trace ~80%)
+            const FADE_START = SEG_DURATION * 3; // commencer fade quand 3/4 du cadre est trace
+            const FADE_DURATION = 500;
+            function fadeAnim(now) {
+              const elapsed = now - startTime;
+              if (elapsed < FADE_START) {
+                requestAnimationFrame(fadeAnim);
+                return;
+              }
+              const t = Math.min(1, (elapsed - FADE_START) / FADE_DURATION);
+              const eased = 1 - Math.pow(1 - t, 3);
+              plane.material.opacity = eased;
+              if (t < 1) requestAnimationFrame(fadeAnim);
+            }
+            requestAnimationFrame(fadeAnim);
+
+            // Toujours redemarrer la video au debut pour ne pas spoiler
+            try { videoEl.currentTime = 0; } catch (e) {}
+            videoEl.play().catch(e => console.warn('video play blocked', cfg.index, e));
+
+            // Phase 3 : ouverture overlay plein ecran apres delai global
+            clearTimeout(pendingOverlayTimer);
+            pendingOverlayTimer = setTimeout(() => openOverlay(cfg), OVERLAY_DELAY);
+          };
+          anchor.onTargetLost = () => {
+            clearTimeout(pendingOverlayTimer);
+            if (!overlayActive) {
+              hint.classList.remove('hidden');
+              scanFrame.classList.remove('hidden');
+              videoEl.pause();
+              try { videoEl.currentTime = 0; } catch (e) {}
+              // Reset visuel (cadre + video) pour re-anim a la prochaine detection
+              lineTop.scale.x = 0;
+              lineRight.scale.y = 0;
+              lineBot.scale.x = 0;
+              lineLeft.scale.y = 0;
+              plane.material.opacity = 0;
+            }
+          };
+        }
+
+        await mindar.start();
+        renderer.setAnimationLoop(() => renderer.render(scene, camera));
+
+        startOverlay.classList.add('hidden');
+        uiOverlay.classList.remove('hidden');
+
+        // Toggle plein ecran (cover) <-> voir tout (contain)
+        document.getElementById('cam-toggle').addEventListener('click', () => {
+          document.body.classList.toggle('camera-contain');
+        });
+      } catch (err) {
+        console.error(err);
+        alert('Erreur : ' + err.message);
+        startBtn.disabled = false;
+        startBtn.textContent = 'Reessayer';
+      }
+    });
+  </script>
+
+  <style>
+    #container {
+      position: fixed; top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      z-index: 1; background: #000;
+      overflow: hidden;
+    }
+    /* Cam et canvas Three.js : remplir plein ecran sans deformer.
+       cover = remplit tout, crop ce qui depasse. */
+    #container > video, #container > canvas {
+      position: absolute !important;
+      top: 50% !important;
+      left: 50% !important;
+      width: 100% !important;
+      height: 100% !important;
+      transform: translate(-50%, -50%);
+      object-fit: cover;
+    }
+    /* Mode "contain" pour voir tout le flux camera (bandes noires possibles) */
+    body.camera-contain #container > video,
+    body.camera-contain #container > canvas {
+      object-fit: contain;
+    }
+    #ui-overlay { z-index: 500; pointer-events: none; }
+    #ui-overlay .btn-icon, #ui-overlay .hint { pointer-events: auto; }
+    #start-overlay { z-index: 1000; }
+
+    /* Bouton toggle vue cam (cover/contain) */
+    .cam-toggle {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 12px) + 8px);
+      right: 12px;
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.6);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(10px);
+      pointer-events: auto;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+
+    /* === Ecran d'accueil (palette Ardoise + layout A) === */
+    #start-overlay {
+      /* Override le fond sombre par defaut de .overlay-screen */
+      background: #e8e5e0;
+      backdrop-filter: none;
+      color: #2c3e50;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: calc(env(safe-area-inset-top, 12px) + 24px) 24px calc(env(safe-area-inset-bottom, 16px) + 140px);
+      animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    #start-overlay .hero {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      text-align: center;
+      max-width: 440px;
+      width: 100%;
+      gap: 22px;
+    }
+    .start-icon {
+      width: 84px; height: 84px;
+      margin: 0 auto;
+      border: 1px solid rgba(44, 62, 80, 0.18);
+      border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      color: #a85a3b;
+    }
+    .start-icon svg { width: 40px; height: 40px; }
+    .start-title {
+      margin: 0;
+      font-size: 1.65rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.22;
+      color: #2c3e50;
+    }
+    .start-subtitle {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.5;
+      color: rgba(44, 62, 80, 0.78);
+    }
+    .start-author {
+      margin-top: 16px;
+      font-size: 0.85rem;
+      line-height: 1.7;
+      color: rgba(44, 62, 80, 0.6);
+    }
+    .start-author strong {
+      color: #2c3e50;
+      font-weight: 600;
+    }
+    .start-author a {
+      color: #a85a3b;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(168, 90, 59, 0.3);
+    }
+    /* CTA fixe en bas */
+    .start-cta-fixed {
+      position: fixed;
+      left: 0; right: 0;
+      bottom: 0;
+      padding: 18px 24px calc(env(safe-area-inset-bottom, 8px) + 6px);
+      background: linear-gradient(180deg, rgba(232, 229, 224, 0) 0%, rgba(232, 229, 224, 0.96) 35%);
+      text-align: center;
+      z-index: 1;
+    }
+    .start-cta {
+      width: 100%;
+      max-width: 360px;
+      padding: 16px 24px;
+      font-size: 1.05rem;
+      background: linear-gradient(135deg, #2c3e50 0%, #1a2733 100%);
+      color: white;
+      border: none;
+      border-radius: 999px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(44, 62, 80, 0.3);
+    }
+    .start-cta:active { transform: translateY(1px); }
+    .start-cta:disabled { opacity: 0.6; cursor: wait; }
+    .start-tip {
+      margin: 12px 0 0;
+      font-size: 0.78rem;
+      color: rgba(44, 62, 80, 0.55);
+    }
+
+    /* === Overlay video plein ecran (sobre) === */
+    .video-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      background: rgba(0, 0, 0, 0);
+      backdrop-filter: blur(0px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s ease-out, background-color 0.5s ease-out, backdrop-filter 0.5s ease-out;
+    }
+    .video-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+      background: rgba(10, 10, 20, 0.92);
+      backdrop-filter: blur(18px);
+    }
+    .video-overlay video {
+      max-width: 96vw;
+      max-height: 88vh;
+      transform: scale(0.5);
+      opacity: 0;
+      transition:
+        transform 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 0.45s ease-out;
+      border-radius: 6px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+      background: #000;
+    }
+    .video-overlay.active video {
+      transform: scale(1);
+      opacity: 1;
+    }
+    .video-close {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 12px) + 12px);
+      right: 16px;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      color: white;
+      font-size: 1.5rem;
+      cursor: pointer;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+    }
+  </style>
+
 </body>
 </html>
