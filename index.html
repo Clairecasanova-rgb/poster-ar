@@ -376,12 +376,6 @@
         await mindar.start();
         renderer.setAnimationLoop(() => renderer.render(scene, camera));
 
-        // Prefetch des 4 videos en arriere-plan pour rendre l'ouverture overlay quasi-instantanee
-        // (la 1ere ouverture devient rapide car les bytes sont deja dans le cache HTTP)
-        TARGETS.forEach(cfg => {
-          fetch(cfg.src).catch(() => {});
-        });
-
         // Toggle plein ecran (cover) <-> voir tout (contain)
         document.getElementById('cam-toggle').addEventListener('click', () => {
           document.body.classList.toggle('camera-contain');
