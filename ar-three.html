@@ -61,97 +61,96 @@
           warmupTolerance: 5    // confirme detection sur 5 frames avant declaration
         });
         const { renderer, scene, camera } = mindar;
-        const anchor = mindar.addAnchor(0);
 
-        // Video plaquee : VideoTexture + auto-fit "cover" sur la cible
-        const videoEl = document.createElement('video');
-        videoEl.src = './assets/videos/clip1.mp4';
-        videoEl.muted = true;
-        videoEl.loop = true;
-        videoEl.playsInline = true;
-        videoEl.setAttribute('playsinline', '');
-        videoEl.setAttribute('webkit-playsinline', '');
-        videoEl.crossOrigin = 'anonymous';
-        videoEl.preload = 'auto';
-        videoEl.style.display = 'none';
-        document.body.appendChild(videoEl);
+        // === Configuration des cibles ===
+        // Chaque entree : index = targetIndex dans le .mind, src = video associee
+        const TARGETS = [
+          { index: 0, src: './assets/videos/clip0.mp4' },
+          { index: 1, src: './assets/videos/clip1.mp4' },
+          { index: 2, src: './assets/videos/clip2.mp4' },
+          { index: 3, src: './assets/videos/clip3.mp4' }
+        ];
 
-        let textureLoaded = false;
-        const texture = new THREE.VideoTexture(videoEl);
-        texture.minFilter = THREE.LinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-        texture.format = THREE.RGBAFormat;
-
-        // texture.image pour VideoTexture est l'element <video> -- on attend les metadata
-        videoEl.addEventListener('loadedmetadata', () => {
-          textureLoaded = true;
-          applyFit();
-        });
-        // Fallback si la video est deja en cache
-        if (videoEl.readyState >= 1) {
-          textureLoaded = true;
-          applyFit();
-        }
-
-        // PlaneGeometry(1, 1) ; on scalera Y au ratio de la cible une fois detectee
-        const geometry = new THREE.PlaneGeometry(1, 1);
-        const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
-        const plane = new THREE.Mesh(geometry, material);
-        anchor.group.add(plane);
-
-        let targetRatio = null; // height/width de la cible (deduit de la matrix MindAR)
-
-        // Facteur d'agrandissement du plane pour compenser l'imprecision tracking
-        // (1.0 = exact, 1.05 = 5% plus grand, 1.10 = 10% plus grand)
-        const OVERSIZE = 1.05;
-
-        function applyFit() {
-          if (!textureLoaded || targetRatio === null) return;
-          // 1. Ajuster le plane au ratio cible + leger sur-dimensionnement
-          plane.scale.set(OVERSIZE, OVERSIZE * targetRatio, OVERSIZE);
-          // 2. Calculer UV "cover" pour cropper sans deformer
-          const tgtAspect = 1 / targetRatio; // largeur/hauteur cible
-          // VideoTexture : utiliser videoWidth/videoHeight (pas width/height)
-          const sourceEl = texture.image;
-          const srcW = sourceEl.videoWidth || sourceEl.width;
-          const srcH = sourceEl.videoHeight || sourceEl.height;
-          const photoAspect = srcW / srcH;
-          if (photoAspect > tgtAspect) {
-            // Photo + paysage que la cible : crop gauche/droite
-            const r = tgtAspect / photoAspect;
-            texture.repeat.set(r, 1);
-            texture.offset.set((1 - r) / 2, 0);
-          } else {
-            // Photo + portrait que la cible : crop haut/bas
-            const r = photoAspect / tgtAspect;
-            texture.repeat.set(1, r);
-            texture.offset.set(0, (1 - r) / 2);
-          }
-          texture.needsUpdate = true;
-        }
-
+        const OVERSIZE = 1.05; // sur-dimensionnement du plane (compense tracking)
         const scanFrame = document.getElementById('scan-frame');
-        anchor.onTargetFound = () => {
-          hint.classList.add('hidden');
-          scanFrame.classList.add('hidden');
-          // A la 1ere detection, lire le ratio de la cible depuis la matrix
-          if (targetRatio === null) {
-            const m = anchor.group.matrix.elements;
-            const sx = Math.sqrt(m[0]*m[0] + m[1]*m[1] + m[2]*m[2]);
-            const sy = Math.sqrt(m[4]*m[4] + m[5]*m[5] + m[6]*m[6]);
-            if (sx > 0 && sy > 0) {
-              targetRatio = sy / sx;
-              applyFit();
-            }
+
+        // Cree un overlay video pour chaque cible
+        for (const cfg of TARGETS) {
+          const anchor = mindar.addAnchor(cfg.index);
+
+          const videoEl = document.createElement('video');
+          videoEl.src = cfg.src;
+          videoEl.muted = true;
+          videoEl.loop = true;
+          videoEl.playsInline = true;
+          videoEl.setAttribute('playsinline', '');
+          videoEl.setAttribute('webkit-playsinline', '');
+          videoEl.crossOrigin = 'anonymous';
+          videoEl.preload = 'auto';
+          videoEl.style.display = 'none';
+          document.body.appendChild(videoEl);
+
+          let textureLoaded = false;
+          const texture = new THREE.VideoTexture(videoEl);
+          texture.minFilter = THREE.LinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+          texture.format = THREE.RGBAFormat;
+
+          videoEl.addEventListener('loadedmetadata', () => {
+            textureLoaded = true;
+            applyFit();
+          });
+          if (videoEl.readyState >= 1) {
+            textureLoaded = true;
           }
-          // Lancer la lecture video
-          videoEl.play().catch(e => console.warn('video play blocked', e));
-        };
-        anchor.onTargetLost = () => {
-          hint.classList.remove('hidden');
-          scanFrame.classList.remove('hidden');
-          videoEl.pause();
-        };
+
+          const geometry = new THREE.PlaneGeometry(1, 1);
+          const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+          const plane = new THREE.Mesh(geometry, material);
+          anchor.group.add(plane);
+
+          let targetRatio = null;
+
+          function applyFit() {
+            if (!textureLoaded || targetRatio === null) return;
+            plane.scale.set(OVERSIZE, OVERSIZE * targetRatio, OVERSIZE);
+            const tgtAspect = 1 / targetRatio;
+            const srcW = videoEl.videoWidth;
+            const srcH = videoEl.videoHeight;
+            if (!srcW || !srcH) return;
+            const photoAspect = srcW / srcH;
+            if (photoAspect > tgtAspect) {
+              const r = tgtAspect / photoAspect;
+              texture.repeat.set(r, 1);
+              texture.offset.set((1 - r) / 2, 0);
+            } else {
+              const r = photoAspect / tgtAspect;
+              texture.repeat.set(1, r);
+              texture.offset.set(0, (1 - r) / 2);
+            }
+            texture.needsUpdate = true;
+          }
+
+          anchor.onTargetFound = () => {
+            hint.classList.add('hidden');
+            scanFrame.classList.add('hidden');
+            if (targetRatio === null) {
+              const m = anchor.group.matrix.elements;
+              const sx = Math.sqrt(m[0]*m[0] + m[1]*m[1] + m[2]*m[2]);
+              const sy = Math.sqrt(m[4]*m[4] + m[5]*m[5] + m[6]*m[6]);
+              if (sx > 0 && sy > 0) {
+                targetRatio = sy / sx;
+                applyFit();
+              }
+            }
+            videoEl.play().catch(e => console.warn('video play blocked', cfg.index, e));
+          };
+          anchor.onTargetLost = () => {
+            hint.classList.remove('hidden');
+            scanFrame.classList.remove('hidden');
+            videoEl.pause();
+          };
+        }
 
         await mindar.start();
         renderer.setAnimationLoop(() => renderer.render(scene, camera));
