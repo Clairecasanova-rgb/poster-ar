@@ -285,22 +285,26 @@
             textureLoaded = true;
           }
 
+          // Sub-group billboard : contient plane + frame, rotation forcee face camera
+          const billboardGroup = new THREE.Group();
+          anchor.group.add(billboardGroup);
+
           const geometry = new THREE.PlaneGeometry(1, 1);
           const material = new THREE.MeshBasicMaterial({
             map: texture,
             transparent: true,
             opacity: 0,
-            depthWrite: false, // evite z-fighting entre planes proches
+            depthWrite: false,
             depthTest: false
           });
           const plane = new THREE.Mesh(geometry, material);
-          // renderOrder unique par cible : evite que les planes proches se cachent
           plane.renderOrder = 10 + cfg.index;
           plane.userData.cfg = cfg;
           plane.userData.detected = false;
           plane.userData.fadeOpacity = 1;
+          plane.userData.billboardGroup = billboardGroup;
           trackedPlanes.push(plane);
-          anchor.group.add(plane);
+          billboardGroup.add(plane);
 
           // Cadre fin blanc qui se trace progressivement autour de la cible
           // (style "calibration" sobre)
@@ -329,8 +333,8 @@
           lineRight.scale.y = 0;
           lineBot.scale.x = 0;
           lineLeft.scale.y = 0;
-          anchor.group.add(frame);
-          plane.userData.frame = frame; // reference pour pouvoir cacher/montrer ensemble
+          billboardGroup.add(frame); // dans le billboard pour suivre la rotation forcee
+          plane.userData.frame = frame;
 
           // Plane scale au ratio de la VIDEO (pas de la cible) -> respecte format video natif
           function applyFit() {
@@ -339,8 +343,10 @@
             const srcH = videoEl.videoHeight;
             if (!srcW || !srcH) return;
             const videoRatio = srcH / srcW;
-            plane.scale.set(OVERSIZE, OVERSIZE * videoRatio, OVERSIZE);
-            frame.scale.set(OVERSIZE, OVERSIZE * videoRatio, OVERSIZE);
+            // Scale au billboardGroup (englobe plane + frame)
+            billboardGroup.scale.set(OVERSIZE, OVERSIZE * videoRatio, OVERSIZE);
+            plane.scale.set(1, 1, 1);
+            frame.scale.set(1, 1, 1);
             texture.repeat.set(1, 1);
             texture.offset.set(0, 0);
             texture.needsUpdate = true;
@@ -423,7 +429,25 @@
         }
 
         await mindar.start();
-        renderer.setAnimationLoop(() => renderer.render(scene, camera));
+
+        // Render loop avec billboard : chaque cible reste face camera (planimetrie)
+        const _parentQ = new THREE.Quaternion();
+        const _camQ = new THREE.Quaternion();
+        renderer.setAnimationLoop(() => {
+          // CRUCIAL : updateWorldMatrix() avant lecture des quaternions
+          // (sans ca, le billboard utilise des valeurs perimees -> sauts/bugs)
+          scene.updateMatrixWorld(true);
+          camera.updateMatrixWorld(true);
+          for (const p of trackedPlanes) {
+            if (!p.userData.detected) continue;
+            const bg = p.userData.billboardGroup;
+            if (!bg || !bg.parent) continue;
+            bg.parent.getWorldQuaternion(_parentQ).invert();
+            camera.getWorldQuaternion(_camQ);
+            bg.quaternion.copy(_parentQ).multiply(_camQ);
+          }
+          renderer.render(scene, camera);
+        });
 
         // Tap : raycasting Three.js pour ouvrir LA bonne vidéo (celle touchée)
         const raycaster = new THREE.Raycaster();
