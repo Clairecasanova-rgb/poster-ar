@@ -158,11 +158,12 @@
           container: document.getElementById('container'),
           imageTargetSrc: './assets/targets.mind',
           uiLoading: 'no', uiScanning: 'no', uiError: 'no',
-          // Lissage du tracking : valeurs PLUS PETITES = plus stable (filtre OneEuro)
+          // Lissage tracking + tolerances : valeurs ajustees pour eviter faux positifs
           filterMinCF: 0.00001,
           filterBeta: 0.0001,
-          missTolerance: 10,    // tolere 10 frames manquees avant 'lost'
-          warmupTolerance: 5    // confirme detection sur 5 frames avant declaration
+          missTolerance: 15,    // tolere 15 frames manquees avant 'lost' (stabilise)
+          warmupTolerance: 10,  // confirme detection sur 10 frames (anti faux positifs)
+          maxTrack: 1           // une seule cible suivie a la fois
         });
         const { renderer, scene, camera } = mindar;
 
@@ -187,7 +188,7 @@
 
         const OVERSIZE = 1.05;
         const POP_DURATION = 350; // ms : anim apparition vidéo plaquée
-        const OVERLAY_DELAY = 900; // ms : delai avant ouverture overlay plein ecran
+        const OVERLAY_DELAY = 1500; // ms : delai avant ouverture overlay (anti faux positifs)
         const scanFrame = document.getElementById('scan-frame');
         const videoOverlay = document.getElementById('video-overlay');
         const overlayVideo = document.getElementById('overlay-video');
