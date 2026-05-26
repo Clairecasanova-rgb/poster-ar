@@ -301,6 +301,8 @@
           plane.userData.detected = false;
           plane.userData.fadeOpacity = 1;
           plane.userData.billboardGroup = billboardGroup;
+          plane.userData.videoEl = videoEl;
+          plane.userData.lineRefs = null; // sera rempli plus bas
           trackedPlanes.push(plane);
           billboardGroup.add(plane);
 
@@ -331,8 +333,9 @@
           lineRight.scale.y = 0;
           lineBot.scale.x = 0;
           lineLeft.scale.y = 0;
-          billboardGroup.add(frame); // dans le billboard pour suivre la rotation forcee
+          billboardGroup.add(frame);
           plane.userData.frame = frame;
+          plane.userData.lineRefs = { top: lineTop, right: lineRight, bot: lineBot, left: lineLeft };
 
           // Plane scale au ratio de la VIDEO (pas de la cible) -> respecte format video natif
           function applyFit() {
@@ -428,16 +431,57 @@
 
         await mindar.start();
 
-        // Render loop avec billboard + force visibility selon state detected
+        // Helper : forcer la perte d'une cible (cleanup complet)
+        function forceLost(p) {
+          if (!p.userData.detected) return;
+          p.userData.detected = false;
+          detectedCount = Math.max(0, detectedCount - 1);
+          if (currentDetectedCfg === p.userData.cfg) {
+            const other = trackedPlanes.find(pp => pp.userData.detected);
+            currentDetectedCfg = other ? other.userData.cfg : null;
+          }
+          if (!overlayActive) {
+            if (detectedCount === 0) scanFrame.classList.remove('hidden');
+            updateCtaVisibility();
+            const v = p.userData.videoEl;
+            if (v) { v.pause(); try { v.currentTime = 0; } catch (e) {} }
+            const l = p.userData.lineRefs;
+            if (l) { l.top.scale.x = 0; l.right.scale.y = 0; l.bot.scale.x = 0; l.left.scale.y = 0; }
+            if (p.material) p.material.opacity = 0;
+          }
+        }
+
+        // Render loop : billboard + visibility + detection matrix figee
         const _parentQ = new THREE.Quaternion();
         const _camQ = new THREE.Quaternion();
+        const STALE_TIMEOUT_MS = 400; // matrix figee >400ms = cible perdue silencieusement
         renderer.setAnimationLoop(() => {
           scene.updateMatrixWorld(true);
           camera.updateMatrixWorld(true);
+          const now = performance.now();
           for (const p of trackedPlanes) {
             const bg = p.userData.billboardGroup;
             if (!bg || !bg.parent) continue;
-            // Visible UNIQUEMENT si JS et MindAR sont d'accord (cible vraiment trackee)
+
+            // Detection "stale" : si la matrix MindAR ne bouge plus, cible perdue
+            if (p.userData.detected) {
+              const m = bg.parent.matrix.elements;
+              const tx = m[12], ty = m[13], tz = m[14];
+              if (p.userData.lastTx === tx && p.userData.lastTy === ty && p.userData.lastTz === tz) {
+                if (!p.userData.staleSince) p.userData.staleSince = now;
+                if (now - p.userData.staleSince > STALE_TIMEOUT_MS) {
+                  forceLost(p);
+                  bg.visible = false;
+                  continue;
+                }
+              } else {
+                p.userData.lastTx = tx;
+                p.userData.lastTy = ty;
+                p.userData.lastTz = tz;
+                p.userData.staleSince = null;
+              }
+            }
+
             const trulyVisible = !!p.userData.detected && !!bg.parent.visible;
             bg.visible = trulyVisible;
             if (!trulyVisible) continue;
