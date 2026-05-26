@@ -101,6 +101,15 @@
       <span id="zoom-value">1.0&times;</span>
       <button class="zoom-btn" data-zoom-dir="1" aria-label="Zoom plus">+</button>
     </div>
+
+    <!-- Banner CTA : apparait quand au moins une cible est detectee -->
+    <div id="tap-cta" class="tap-cta">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+        <path d="M9 11V5a3 3 0 0 1 6 0v9"/>
+        <path d="M9 11l-2 4a4 4 0 0 0 4 6h3a5 5 0 0 0 5-5v-4l-4-1"/>
+      </svg>
+      <span>Touchez la vid&eacute;o pour la voir en grand</span>
+    </div>
   </div>
 
   <div id="container"></div>
@@ -158,12 +167,12 @@
           container: document.getElementById('container'),
           imageTargetSrc: './assets/targets.mind',
           uiLoading: 'no', uiScanning: 'no', uiError: 'no',
-          // Lissage tracking + tolerances : valeurs ajustees pour eviter faux positifs
+          // Lissage tracking + tolerances : valeurs ajustees
           filterMinCF: 0.00001,
           filterBeta: 0.0001,
-          missTolerance: 15,    // tolere 15 frames manquees avant 'lost' (stabilise)
-          warmupTolerance: 10,  // confirme detection sur 10 frames (anti faux positifs)
-          maxTrack: 1           // une seule cible suivie a la fois
+          missTolerance: 15,
+          warmupTolerance: 10,
+          maxTrack: 4           // suivre plusieurs cibles simultanement
         });
         const { renderer, scene, camera } = mindar;
 
@@ -196,7 +205,20 @@
 
         let overlayActive = false;
         let activeCfg = null;
-        let currentDetectedCfg = null; // cible actuellement detectee (pour le tap)
+        let currentDetectedCfg = null;
+        let detectedCount = 0;
+        const trackedPlanes = [];
+        const tapCta = document.getElementById('tap-cta');
+
+        function updateCtaVisibility() {
+          if (detectedCount > 0 && !overlayActive) {
+            tapCta.classList.add('visible');
+            hint.textContent = 'Touchez la vidéo';
+          } else {
+            tapCta.classList.remove('visible');
+            hint.textContent = 'Pointez vers une image du poster';
+          }
+        }
 
         const overlayCaption = document.getElementById('overlay-caption');
         const videoLoader = document.getElementById('video-loader');
@@ -210,7 +232,7 @@
           if (overlayActive) return;
           overlayActive = true;
           activeCfg = cfg;
-          // Reset loader : visible avant chargement
+          tapCta.classList.remove('visible');
           videoLoader.classList.remove('hidden');
           overlayVideo.src = cfg.src;
           overlayVideo.muted = true;
@@ -228,6 +250,7 @@
             overlayVideo.load();
             overlayActive = false;
             activeCfg = null;
+            updateCtaVisibility(); // si une cible est encore detectee, ramene le CTA
           }, 500);
         }
         overlayClose.addEventListener('click', closeOverlay);
@@ -265,6 +288,9 @@
           const geometry = new THREE.PlaneGeometry(1, 1);
           const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0 });
           const plane = new THREE.Mesh(geometry, material);
+          plane.userData.cfg = cfg;
+          plane.userData.detected = false;
+          trackedPlanes.push(plane);
           anchor.group.add(plane);
 
           // Cadre fin blanc qui se trace progressivement autour de la cible
@@ -313,10 +339,12 @@
           }
 
           anchor.onTargetFound = () => {
-            if (overlayActive) return;
+            if (plane.userData.detected) return;
+            plane.userData.detected = true;
+            detectedCount++;
             currentDetectedCfg = cfg;
-            hint.textContent = 'Touchez pour ouvrir la vidéo';
             scanFrame.classList.add('hidden');
+            updateCtaVisibility();
             applyFit();
 
             // Phase 1 : tracage progressif du cadre (4 segments en sequence)
@@ -362,13 +390,22 @@
             // L'ouverture plein ecran est maintenant declenchee par un tap utilisateur
           };
           anchor.onTargetLost = () => {
-            if (currentDetectedCfg === cfg) currentDetectedCfg = null;
+            if (!plane.userData.detected) return;
+            plane.userData.detected = false;
+            detectedCount = Math.max(0, detectedCount - 1);
+            if (currentDetectedCfg === cfg) {
+              // Si une autre cible est encore detectee, la promouvoir comme current
+              const other = trackedPlanes.find(p => p.userData.detected);
+              currentDetectedCfg = other ? other.userData.cfg : null;
+            }
             if (!overlayActive) {
-              hint.textContent = 'Pointez vers une image du poster';
-              scanFrame.classList.remove('hidden');
+              if (detectedCount === 0) {
+                scanFrame.classList.remove('hidden');
+              }
+              updateCtaVisibility();
               videoEl.pause();
               try { videoEl.currentTime = 0; } catch (e) {}
-              // Reset visuel (cadre + video) pour re-anim a la prochaine detection
+              // Reset visuel local (uniquement le cadre + opacite de CETTE cible)
               lineTop.scale.x = 0;
               lineRight.scale.y = 0;
               lineBot.scale.x = 0;
@@ -381,9 +418,22 @@
         await mindar.start();
         renderer.setAnimationLoop(() => renderer.render(scene, camera));
 
-        // Tap sur la zone camera : ouvre l'overlay si une cible est actuellement detectee
-        document.getElementById('container').addEventListener('click', () => {
-          if (currentDetectedCfg && !overlayActive) {
+        // Tap : raycasting Three.js pour ouvrir LA bonne vidéo (celle touchée)
+        const raycaster = new THREE.Raycaster();
+        const tapPos = new THREE.Vector2();
+        document.getElementById('container').addEventListener('click', (event) => {
+          if (overlayActive) return;
+          const rect = event.currentTarget.getBoundingClientRect();
+          tapPos.x =  ((event.clientX - rect.left) / rect.width)  * 2 - 1;
+          tapPos.y = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
+          raycaster.setFromCamera(tapPos, camera);
+          // Filtrer les planes detectes uniquement
+          const candidates = trackedPlanes.filter(p => p.userData.detected);
+          const hits = raycaster.intersectObjects(candidates);
+          if (hits.length > 0) {
+            openOverlay(hits[0].object.userData.cfg);
+          } else if (currentDetectedCfg) {
+            // Fallback : tap a cote, mais cible detectee -> ouvre la derniere
             openOverlay(currentDetectedCfg);
           }
         });
@@ -483,6 +533,37 @@
     #ui-overlay { z-index: 500; pointer-events: none; }
     #ui-overlay .btn-icon, #ui-overlay .hint { pointer-events: auto; }
     #start-overlay { z-index: 1000; }
+
+    /* === CTA "Touchez pour ouvrir" === */
+    .tap-cta {
+      position: absolute;
+      bottom: calc(env(safe-area-inset-bottom, 16px) + 90px); /* au-dessus du zoom */
+      left: 50%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 20px;
+      background: rgba(0, 0, 0, 0.78);
+      color: white;
+      border-radius: 999px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.4s;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(10px);
+      white-space: nowrap;
+      transform: translateX(-50%) scale(0.95);
+    }
+    .tap-cta.visible {
+      opacity: 1;
+      animation: pulseCTA 1.8s ease-in-out infinite;
+    }
+    @keyframes pulseCTA {
+      0%, 100% { transform: translateX(-50%) scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0.15); }
+      50%      { transform: translateX(-50%) scale(1.03); box-shadow: 0 0 0 8px rgba(255,255,255,0); }
+    }
 
     /* === Controle de zoom camera === */
     .zoom-control {
