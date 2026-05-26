@@ -167,12 +167,12 @@
           container: document.getElementById('container'),
           imageTargetSrc: './assets/targets.mind',
           uiLoading: 'no', uiScanning: 'no', uiError: 'no',
-          // Lissage tracking + tolerances : valeurs ajustees
-          filterMinCF: 0.00001,
-          filterBeta: 0.0001,
-          missTolerance: 15,
-          warmupTolerance: 10,
-          maxTrack: 4           // suivre plusieurs cibles simultanement
+          // Lissage tracking : valeurs ajustees pour suivi tres stable
+          filterMinCF: 0.000001,   // tres faible = tres lisse
+          filterBeta: 0.00001,
+          missTolerance: 30,       // tolere 30 frames manquees (~1s) avant 'lost' (anti clignotement)
+          warmupTolerance: 5,      // 5 frames suffisent pour declarer la detection
+          maxTrack: 2              // 2 cibles simultanees max (charge CPU réduite = suivi plus stable)
         });
         const { renderer, scene, camera } = mindar;
 
