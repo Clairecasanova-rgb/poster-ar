@@ -167,12 +167,12 @@
           container: document.getElementById('container'),
           imageTargetSrc: './assets/targets.mind',
           uiLoading: 'no', uiScanning: 'no', uiError: 'no',
-          // Tracking : reglages defauts + missTolerance bas (anti planes fantomes)
+          // Tracking : reglages defauts MindAR
           filterMinCF: 0.0001,
           filterBeta: 0.001,
-          missTolerance: 3,        // perte declaree tres vite
+          missTolerance: 5,
           warmupTolerance: 5,
-          maxTrack: 3
+          maxTrack: 1              // une cible a la fois
         });
         const { renderer, scene, camera } = mindar;
 
@@ -283,28 +283,14 @@
             textureLoaded = true;
           }
 
-          // Sub-group billboard : contient plane + frame, rotation forcee face camera
-          const billboardGroup = new THREE.Group();
-          anchor.group.add(billboardGroup);
-
           const geometry = new THREE.PlaneGeometry(1, 1);
-          const material = new THREE.MeshBasicMaterial({
-            map: texture,
-            transparent: true,
-            opacity: 0,
-            depthWrite: false,
-            depthTest: false
-          });
+          const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0 });
           const plane = new THREE.Mesh(geometry, material);
-          plane.renderOrder = 10 + cfg.index;
           plane.userData.cfg = cfg;
           plane.userData.detected = false;
-          plane.userData.fadeOpacity = 1;
-          plane.userData.billboardGroup = billboardGroup;
           plane.userData.videoEl = videoEl;
-          plane.userData.lineRefs = null; // sera rempli plus bas
           trackedPlanes.push(plane);
-          billboardGroup.add(plane);
+          anchor.group.add(plane);
 
           // Cadre fin blanc qui se trace progressivement autour de la cible
           // (style "calibration" sobre)
@@ -333,7 +319,7 @@
           lineRight.scale.y = 0;
           lineBot.scale.x = 0;
           lineLeft.scale.y = 0;
-          billboardGroup.add(frame);
+          anchor.group.add(frame);
           plane.userData.frame = frame;
           plane.userData.lineRefs = { top: lineTop, right: lineRight, bot: lineBot, left: lineLeft };
 
@@ -344,15 +330,14 @@
             const srcH = videoEl.videoHeight;
             if (!srcW || !srcH) return;
             const videoRatio = srcH / srcW;
-            // Scale au billboardGroup (englobe plane + frame)
-            billboardGroup.scale.set(OVERSIZE, OVERSIZE * videoRatio, OVERSIZE);
-            plane.scale.set(1, 1, 1);
-            frame.scale.set(1, 1, 1);
+            plane.scale.set(OVERSIZE, OVERSIZE * videoRatio, OVERSIZE);
+            frame.scale.set(OVERSIZE, OVERSIZE * videoRatio, OVERSIZE);
             texture.repeat.set(1, 1);
             texture.offset.set(0, 0);
             texture.needsUpdate = true;
           }
 
+          let pendingOverlayTimer = null;
           anchor.onTargetFound = () => {
             if (plane.userData.detected) return;
             plane.userData.detected = true;
@@ -361,6 +346,9 @@
             scanFrame.classList.add('hidden');
             updateCtaVisibility();
             applyFit();
+            // Auto-ouverture du plein ecran apres petit delai de stabilisation
+            clearTimeout(pendingOverlayTimer);
+            pendingOverlayTimer = setTimeout(() => openOverlay(cfg), 600);
 
             // Phase 1 : tracage progressif du cadre (4 segments en sequence)
             // Top -> Right -> Bot -> Left, ~150ms par segment
@@ -408,15 +396,10 @@
             if (!plane.userData.detected) return;
             plane.userData.detected = false;
             detectedCount = Math.max(0, detectedCount - 1);
-            if (currentDetectedCfg === cfg) {
-              const other = trackedPlanes.find(p => p.userData.detected);
-              currentDetectedCfg = other ? other.userData.cfg : null;
-            }
+            clearTimeout(pendingOverlayTimer);
+            if (currentDetectedCfg === cfg) currentDetectedCfg = null;
             if (!overlayActive) {
-              if (detectedCount === 0) {
-                scanFrame.classList.remove('hidden');
-              }
-              updateARVisibility();
+              scanFrame.classList.remove('hidden');
               updateCtaVisibility();
               videoEl.pause();
               try { videoEl.currentTime = 0; } catch (e) {}
@@ -451,61 +434,9 @@
           }
         }
 
-        // Render loop : billboard + hide visuel si hors cadre (NDC projection)
-        const _parentQ = new THREE.Quaternion();
-        const _camQ = new THREE.Quaternion();
-        const _ndcPos = new THREE.Vector3();
-        renderer.setAnimationLoop(() => {
-          scene.updateMatrixWorld(true);
-          camera.updateMatrixWorld(true);
-          for (const p of trackedPlanes) {
-            const bg = p.userData.billboardGroup;
-            if (!bg || !bg.parent) continue;
+        // Render loop standard : MindAR gere tracking + visibilite, on ne fait que render
+        renderer.setAnimationLoop(() => renderer.render(scene, camera));
 
-            const baseVisible = !!p.userData.detected && !!bg.parent.visible;
-            if (!baseVisible) {
-              bg.visible = false;
-              continue;
-            }
-
-            // Cache si la projection sort du frustum camera
-            bg.parent.getWorldPosition(_ndcPos);
-            _ndcPos.project(camera);
-            const inFrame = Math.abs(_ndcPos.x) <= 1
-                         && Math.abs(_ndcPos.y) <= 1
-                         && _ndcPos.z >= -1 && _ndcPos.z <= 1;
-            if (!inFrame) {
-              bg.visible = false;
-              continue;
-            }
-
-            bg.visible = true;
-            bg.parent.getWorldQuaternion(_parentQ).invert();
-            camera.getWorldQuaternion(_camQ);
-            bg.quaternion.copy(_parentQ).multiply(_camQ);
-          }
-          renderer.render(scene, camera);
-        });
-
-        // Tap : raycasting Three.js pour ouvrir LA bonne vidéo (celle touchée)
-        const raycaster = new THREE.Raycaster();
-        const tapPos = new THREE.Vector2();
-        document.getElementById('container').addEventListener('click', (event) => {
-          if (overlayActive) return;
-          const rect = event.currentTarget.getBoundingClientRect();
-          tapPos.x =  ((event.clientX - rect.left) / rect.width)  * 2 - 1;
-          tapPos.y = -((event.clientY - rect.top)  / rect.height) * 2 + 1;
-          raycaster.setFromCamera(tapPos, camera);
-          // Filtrer les planes detectes uniquement
-          const candidates = trackedPlanes.filter(p => p.userData.detected);
-          const hits = raycaster.intersectObjects(candidates);
-          if (hits.length > 0) {
-            openOverlay(hits[0].object.userData.cfg);
-          } else if (currentDetectedCfg) {
-            // Fallback : tap a cote, mais cible detectee -> ouvre la derniere
-            openOverlay(currentDetectedCfg);
-          }
-        });
 
         // === Controle de zoom camera ===
         // Hardware (Android Chrome via MediaTrack.zoom) OU fallback CSS (iOS, etc.)
