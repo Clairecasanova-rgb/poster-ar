@@ -383,37 +383,47 @@
         await mindar.start();
         renderer.setAnimationLoop(() => renderer.render(scene, camera));
 
-        // === Controle de zoom hardware camera ===
-        // Verifier si le device supporte zoom via MediaStreamTrack
+        // === Controle de zoom camera ===
+        // Hardware (Android Chrome via MediaTrack.zoom) OU fallback CSS (iOS, etc.)
         (function setupZoom() {
-          const containerVid = document.querySelector('#container video');
-          if (!containerVid || !containerVid.srcObject) return;
-          const track = containerVid.srcObject.getVideoTracks()[0];
-          if (!track || !track.getCapabilities) return;
-          const caps = track.getCapabilities();
-          if (!caps.zoom) return; // Pas supporte (iOS Safari notamment)
-
-          const zoomCtrl = document.getElementById('zoom-control');
+          const zoomCtrl  = document.getElementById('zoom-control');
           const zoomMinus = zoomCtrl.querySelector('[data-zoom-dir="-1"]');
           const zoomPlus  = zoomCtrl.querySelector('[data-zoom-dir="1"]');
           const zoomVal   = document.getElementById('zoom-value');
+          const container = document.getElementById('container');
 
-          const minZ = caps.zoom.min || 1;
-          const maxZ = caps.zoom.max || 4;
-          const step = caps.zoom.step || 0.5;
-          let zoom = track.getSettings().zoom || minZ;
+          const containerVid = document.querySelector('#container video');
+          const track = (containerVid && containerVid.srcObject)
+            ? containerVid.srcObject.getVideoTracks()[0]
+            : null;
+          const caps = (track && track.getCapabilities) ? track.getCapabilities() : {};
+          const hwZoom = !!caps.zoom;
+
+          // Si hardware: utilise les capacites du device
+          // Sinon (iOS, etc.): fallback CSS scale 1× → 3×
+          const minZ = hwZoom ? caps.zoom.min : 1;
+          const maxZ = hwZoom ? caps.zoom.max : 3;
+          const step = hwZoom ? (caps.zoom.step || 0.5) : 0.5;
+          let zoom = hwZoom ? (track.getSettings().zoom || minZ) : 1;
 
           const updateUI = () => {
             zoomVal.textContent = zoom.toFixed(1) + '×';
             zoomMinus.disabled = zoom <= minZ + 0.001;
             zoomPlus.disabled  = zoom >= maxZ - 0.001;
           };
+
           const setZoom = async (z) => {
             zoom = Math.max(minZ, Math.min(maxZ, z));
-            try {
-              await track.applyConstraints({ advanced: [{ zoom }] });
-              updateUI();
-            } catch (e) { /* ignore */ }
+            if (hwZoom) {
+              try {
+                await track.applyConstraints({ advanced: [{ zoom }] });
+              } catch (e) { /* ignore */ }
+            } else {
+              // Fallback CSS : scale visuel du container camera
+              container.style.transform = `scale(${zoom})`;
+              container.style.transformOrigin = 'center center';
+            }
+            updateUI();
           };
 
           zoomMinus.addEventListener('click', () => setZoom(zoom - step * 2));
