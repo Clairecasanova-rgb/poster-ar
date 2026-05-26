@@ -451,15 +451,38 @@
           }
         }
 
-        // Render loop : billboard + visibility synchronisee MindAR
+        // Render loop : billboard + visibility + check hors-cadre (NDC projection)
         const _parentQ = new THREE.Quaternion();
         const _camQ = new THREE.Quaternion();
+        const _ndcPos = new THREE.Vector3();
+        const OUT_OF_FRAME_MS = 500; // cible hors cadre >500ms = force lost
         renderer.setAnimationLoop(() => {
           scene.updateMatrixWorld(true);
           camera.updateMatrixWorld(true);
+          const now = performance.now();
           for (const p of trackedPlanes) {
             const bg = p.userData.billboardGroup;
             if (!bg || !bg.parent) continue;
+
+            // Verification "in frame" : projeter le centre de la cible en NDC
+            if (p.userData.detected && bg.parent.visible) {
+              bg.parent.getWorldPosition(_ndcPos);
+              _ndcPos.project(camera);
+              const inFrame = Math.abs(_ndcPos.x) <= 1
+                           && Math.abs(_ndcPos.y) <= 1
+                           && _ndcPos.z >= -1 && _ndcPos.z <= 1;
+              if (!inFrame) {
+                if (!p.userData.outOfFrameSince) p.userData.outOfFrameSince = now;
+                bg.visible = false; // cache immediatement
+                if (now - p.userData.outOfFrameSince > OUT_OF_FRAME_MS) {
+                  forceLost(p);
+                }
+                continue;
+              } else {
+                p.userData.outOfFrameSince = null;
+              }
+            }
+
             const trulyVisible = !!p.userData.detected && !!bg.parent.visible;
             bg.visible = trulyVisible;
             if (!trulyVisible) continue;
