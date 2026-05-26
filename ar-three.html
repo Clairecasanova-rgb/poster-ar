@@ -286,11 +286,19 @@
           }
 
           const geometry = new THREE.PlaneGeometry(1, 1);
-          const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0 });
+          const material = new THREE.MeshBasicMaterial({
+            map: texture,
+            transparent: true,
+            opacity: 0,
+            depthWrite: false, // evite z-fighting entre planes proches
+            depthTest: false
+          });
           const plane = new THREE.Mesh(geometry, material);
+          // renderOrder unique par cible : evite que les planes proches se cachent
+          plane.renderOrder = 10 + cfg.index;
           plane.userData.cfg = cfg;
           plane.userData.detected = false;
-          plane.userData.fadeOpacity = 1; // opacite cible (apres anim fade-in)
+          plane.userData.fadeOpacity = 1;
           trackedPlanes.push(plane);
           anchor.group.add(plane);
 
@@ -368,9 +376,9 @@
             }
             requestAnimationFrame(frameAnim);
 
-            // Phase 2 : fade-in de la video (apres que le cadre soit trace ~80%)
-            const FADE_START = SEG_DURATION * 3; // commencer fade quand 3/4 du cadre est trace
-            const FADE_DURATION = 500;
+            // Phase 2 : fade-in rapide de la video (200ms, demarre quasi immediatement)
+            const FADE_START = SEG_DURATION; // demarre apres le 1er segment trace
+            const FADE_DURATION = 200;
             function fadeAnim(now) {
               const elapsed = now - startTime;
               if (elapsed < FADE_START) {
