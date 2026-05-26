@@ -338,6 +338,7 @@
           }
 
           let pendingOverlayTimer = null;
+          plane.userData.shownOnce = false;
           anchor.onTargetFound = () => {
             if (plane.userData.detected) return;
             plane.userData.detected = true;
@@ -346,9 +347,16 @@
             scanFrame.classList.add('hidden');
             updateCtaVisibility();
             applyFit();
-            // Auto-ouverture du plein ecran apres petit delai de stabilisation
-            clearTimeout(pendingOverlayTimer);
-            pendingOverlayTimer = setTimeout(() => openOverlay(cfg), 600);
+            // Auto-ouverture du plein ecran SEULEMENT si pas deja affiche pour cette detection
+            if (!plane.userData.shownOnce) {
+              clearTimeout(pendingOverlayTimer);
+              pendingOverlayTimer = setTimeout(() => {
+                if (plane.userData.detected) {
+                  openOverlay(cfg);
+                  plane.userData.shownOnce = true;
+                }
+              }, 600);
+            }
 
             // Phase 1 : tracage progressif du cadre (4 segments en sequence)
             // Top -> Right -> Bot -> Left, ~150ms par segment
@@ -395,6 +403,7 @@
           anchor.onTargetLost = () => {
             if (!plane.userData.detected) return;
             plane.userData.detected = false;
+            plane.userData.shownOnce = false; // reset pour permettre auto-open a la prochaine detection
             detectedCount = Math.max(0, detectedCount - 1);
             clearTimeout(pendingOverlayTimer);
             if (currentDetectedCfg === cfg) currentDetectedCfg = null;
@@ -436,6 +445,14 @@
 
         // Render loop standard : MindAR gere tracking + visibilite, on ne fait que render
         renderer.setAnimationLoop(() => renderer.render(scene, camera));
+
+        // Tap sur la vue camera : reouvre le plein ecran si une cible est detectee
+        document.getElementById('container').addEventListener('click', () => {
+          if (overlayActive) return;
+          if (currentDetectedCfg) {
+            openOverlay(currentDetectedCfg);
+          }
+        });
 
 
         // === Controle de zoom camera ===
