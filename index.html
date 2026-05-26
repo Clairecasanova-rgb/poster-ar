@@ -210,30 +210,10 @@
         const trackedPlanes = [];
         const tapCta = document.getElementById('tap-cta');
 
-        // Seuil min de cibles detectees simultanement pour activer l'affichage AR
-        // (evite chevauchements/oscillations quand le tracking est partiel)
-        const MIN_TARGETS_VISIBLE = 3;
-
-        function updateARVisibility() {
-          const shouldShow = detectedCount >= MIN_TARGETS_VISIBLE;
-          trackedPlanes.forEach(p => {
-            const visible = shouldShow && p.userData.detected;
-            p.visible = visible;
-            if (p.userData.frame) p.userData.frame.visible = visible;
-          });
-        }
-
         function updateCtaVisibility() {
-          if (overlayActive) {
-            tapCta.classList.remove('visible');
-            return;
-          }
-          if (detectedCount >= MIN_TARGETS_VISIBLE) {
+          if (detectedCount > 0 && !overlayActive) {
             tapCta.classList.add('visible');
             hint.textContent = 'Touchez la vidéo';
-          } else if (detectedCount > 0) {
-            tapCta.classList.remove('visible');
-            hint.textContent = `Pointez le poster en entier (${detectedCount}/${MIN_TARGETS_VISIBLE})`;
           } else {
             tapCta.classList.remove('visible');
             hint.textContent = 'Pointez vers une image du poster';
@@ -364,7 +344,6 @@
             detectedCount++;
             currentDetectedCfg = cfg;
             scanFrame.classList.add('hidden');
-            updateARVisibility();
             updateCtaVisibility();
             applyFit();
 
