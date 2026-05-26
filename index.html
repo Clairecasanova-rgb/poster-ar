@@ -94,6 +94,13 @@
     <button id="cam-toggle" class="cam-toggle" aria-label="Mode camera" title="Basculer vue camera (plein / complete)">&#x21F2;</button>
     <div id="hint" class="hint">Pointez vers une image du poster</div>
     <div id="scan-frame" class="scan-frame"><span></span></div>
+
+    <!-- Controle de zoom hardware (s'affiche seulement si le device le supporte) -->
+    <div id="zoom-control" class="zoom-control hidden">
+      <button class="zoom-btn" data-zoom-dir="-1" aria-label="Zoom moins">&minus;</button>
+      <span id="zoom-value">1.0&times;</span>
+      <button class="zoom-btn" data-zoom-dir="1" aria-label="Zoom plus">+</button>
+    </div>
   </div>
 
   <div id="container"></div>
@@ -376,6 +383,46 @@
         await mindar.start();
         renderer.setAnimationLoop(() => renderer.render(scene, camera));
 
+        // === Controle de zoom hardware camera ===
+        // Verifier si le device supporte zoom via MediaStreamTrack
+        (function setupZoom() {
+          const containerVid = document.querySelector('#container video');
+          if (!containerVid || !containerVid.srcObject) return;
+          const track = containerVid.srcObject.getVideoTracks()[0];
+          if (!track || !track.getCapabilities) return;
+          const caps = track.getCapabilities();
+          if (!caps.zoom) return; // Pas supporte (iOS Safari notamment)
+
+          const zoomCtrl = document.getElementById('zoom-control');
+          const zoomMinus = zoomCtrl.querySelector('[data-zoom-dir="-1"]');
+          const zoomPlus  = zoomCtrl.querySelector('[data-zoom-dir="1"]');
+          const zoomVal   = document.getElementById('zoom-value');
+
+          const minZ = caps.zoom.min || 1;
+          const maxZ = caps.zoom.max || 4;
+          const step = caps.zoom.step || 0.5;
+          let zoom = track.getSettings().zoom || minZ;
+
+          const updateUI = () => {
+            zoomVal.textContent = zoom.toFixed(1) + '×';
+            zoomMinus.disabled = zoom <= minZ + 0.001;
+            zoomPlus.disabled  = zoom >= maxZ - 0.001;
+          };
+          const setZoom = async (z) => {
+            zoom = Math.max(minZ, Math.min(maxZ, z));
+            try {
+              await track.applyConstraints({ advanced: [{ zoom }] });
+              updateUI();
+            } catch (e) { /* ignore */ }
+          };
+
+          zoomMinus.addEventListener('click', () => setZoom(zoom - step * 2));
+          zoomPlus .addEventListener('click', () => setZoom(zoom + step * 2));
+
+          updateUI();
+          zoomCtrl.classList.remove('hidden');
+        })();
+
         // Toggle plein ecran (cover) <-> voir tout (contain)
         document.getElementById('cam-toggle').addEventListener('click', () => {
           document.body.classList.toggle('camera-contain');
@@ -421,6 +468,46 @@
     #ui-overlay { z-index: 500; pointer-events: none; }
     #ui-overlay .btn-icon, #ui-overlay .hint { pointer-events: auto; }
     #start-overlay { z-index: 1000; }
+
+    /* === Controle de zoom camera === */
+    .zoom-control {
+      position: absolute;
+      bottom: calc(env(safe-area-inset-bottom, 16px) + 20px);
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(0, 0, 0, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      padding: 4px 6px;
+      pointer-events: auto;
+      backdrop-filter: blur(10px);
+    }
+    .zoom-control.hidden { display: none !important; }
+    .zoom-btn {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      border: none;
+      color: white;
+      font-size: 1.3rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .zoom-btn:active { background: rgba(255, 255, 255, 0.25); }
+    .zoom-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    #zoom-value {
+      min-width: 46px;
+      text-align: center;
+      font-size: 0.88rem;
+      color: white;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+    }
 
     /* Bouton toggle vue cam (cover/contain) */
     .cam-toggle {
