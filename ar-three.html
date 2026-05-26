@@ -168,11 +168,11 @@
           imageTargetSrc: './assets/targets.mind',
           uiLoading: 'no', uiScanning: 'no', uiError: 'no',
           // Lissage tracking : valeurs ajustees pour suivi tres stable
-          filterMinCF: 0.000001,   // tres faible = tres lisse
+          filterMinCF: 0.000001,
           filterBeta: 0.00001,
-          missTolerance: 30,       // tolere 30 frames manquees (~1s) avant 'lost' (anti clignotement)
-          warmupTolerance: 5,      // 5 frames suffisent pour declarer la detection
-          maxTrack: 2              // 2 cibles simultanees max (charge CPU réduite = suivi plus stable)
+          missTolerance: 30,
+          warmupTolerance: 5,
+          maxTrack: 4              // tracker toutes les cibles
         });
         const { renderer, scene, camera } = mindar;
 
@@ -210,10 +210,30 @@
         const trackedPlanes = [];
         const tapCta = document.getElementById('tap-cta');
 
+        // Seuil min de cibles detectees simultanement pour activer l'affichage AR
+        // (evite chevauchements/oscillations quand le tracking est partiel)
+        const MIN_TARGETS_VISIBLE = 3;
+
+        function updateARVisibility() {
+          const shouldShow = detectedCount >= MIN_TARGETS_VISIBLE;
+          trackedPlanes.forEach(p => {
+            const visible = shouldShow && p.userData.detected;
+            p.visible = visible;
+            if (p.userData.frame) p.userData.frame.visible = visible;
+          });
+        }
+
         function updateCtaVisibility() {
-          if (detectedCount > 0 && !overlayActive) {
+          if (overlayActive) {
+            tapCta.classList.remove('visible');
+            return;
+          }
+          if (detectedCount >= MIN_TARGETS_VISIBLE) {
             tapCta.classList.add('visible');
             hint.textContent = 'Touchez la vidéo';
+          } else if (detectedCount > 0) {
+            tapCta.classList.remove('visible');
+            hint.textContent = `Pointez le poster en entier (${detectedCount}/${MIN_TARGETS_VISIBLE})`;
           } else {
             tapCta.classList.remove('visible');
             hint.textContent = 'Pointez vers une image du poster';
@@ -290,6 +310,7 @@
           const plane = new THREE.Mesh(geometry, material);
           plane.userData.cfg = cfg;
           plane.userData.detected = false;
+          plane.userData.fadeOpacity = 1; // opacite cible (apres anim fade-in)
           trackedPlanes.push(plane);
           anchor.group.add(plane);
 
@@ -321,6 +342,7 @@
           lineBot.scale.x = 0;
           lineLeft.scale.y = 0;
           anchor.group.add(frame);
+          plane.userData.frame = frame; // reference pour pouvoir cacher/montrer ensemble
 
           // Plane scale au ratio de la VIDEO (pas de la cible) -> respecte format video natif
           function applyFit() {
@@ -342,6 +364,7 @@
             detectedCount++;
             currentDetectedCfg = cfg;
             scanFrame.classList.add('hidden');
+            updateARVisibility();
             updateCtaVisibility();
             applyFit();
 
@@ -392,7 +415,6 @@
             plane.userData.detected = false;
             detectedCount = Math.max(0, detectedCount - 1);
             if (currentDetectedCfg === cfg) {
-              // Si une autre cible est encore detectee, la promouvoir comme current
               const other = trackedPlanes.find(p => p.userData.detected);
               currentDetectedCfg = other ? other.userData.cfg : null;
             }
@@ -400,10 +422,10 @@
               if (detectedCount === 0) {
                 scanFrame.classList.remove('hidden');
               }
+              updateARVisibility();
               updateCtaVisibility();
               videoEl.pause();
               try { videoEl.currentTime = 0; } catch (e) {}
-              // Reset visuel local (uniquement le cadre + opacite de CETTE cible)
               lineTop.scale.x = 0;
               lineRight.scale.y = 0;
               lineBot.scale.x = 0;
