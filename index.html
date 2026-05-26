@@ -473,13 +473,18 @@
               continue;
             }
 
-            // Check matrix figee (MindAR garde la derniere position connue sans update)
+            // Check matrix figee (avec tolerance pour micro-variations de lissage)
             const m = bg.parent.matrix.elements;
             const tx = m[12], ty = m[13], tz = m[14];
-            if (p.userData.lastTx === tx && p.userData.lastTy === ty && p.userData.lastTz === tz) {
+            const EPS = 1e-3;
+            const dx = Math.abs(tx - (p.userData.lastTx ?? tx));
+            const dy = Math.abs(ty - (p.userData.lastTy ?? ty));
+            const dz = Math.abs(tz - (p.userData.lastTz ?? tz));
+            const isFrozen = dx < EPS && dy < EPS && dz < EPS;
+            if (isFrozen && p.userData.lastTx !== undefined) {
               if (!p.userData.staleSince) p.userData.staleSince = now;
               if (now - p.userData.staleSince > STALE_MS) {
-                bg.visible = false; // cache mais ne touche pas detected
+                bg.visible = false;
                 continue;
               }
             } else {
