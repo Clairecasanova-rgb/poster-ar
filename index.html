@@ -451,14 +451,18 @@
           }
         }
 
-        // Render loop : billboard + visibility + hide visuel si hors cadre
-        // (state JS n'est PAS touche pour ne pas perturber MindAR)
+        // Render loop : billboard + hide visuel intelligent
+        // - Si hors cadre (NDC projection) : cache visuel
+        // - Si matrix figee >800ms : MindAR a "oublie" la perte -> cache visuel
+        // (state JS n'est jamais modifie pour ne pas perturber MindAR)
         const _parentQ = new THREE.Quaternion();
         const _camQ = new THREE.Quaternion();
         const _ndcPos = new THREE.Vector3();
+        const STALE_MS = 800; // tolerance pour matrix figee
         renderer.setAnimationLoop(() => {
           scene.updateMatrixWorld(true);
           camera.updateMatrixWorld(true);
+          const now = performance.now();
           for (const p of trackedPlanes) {
             const bg = p.userData.billboardGroup;
             if (!bg || !bg.parent) continue;
@@ -469,7 +473,23 @@
               continue;
             }
 
-            // Hide visuel si la projection sort du frustum (sans forcer lost)
+            // Check matrix figee (MindAR garde la derniere position connue sans update)
+            const m = bg.parent.matrix.elements;
+            const tx = m[12], ty = m[13], tz = m[14];
+            if (p.userData.lastTx === tx && p.userData.lastTy === ty && p.userData.lastTz === tz) {
+              if (!p.userData.staleSince) p.userData.staleSince = now;
+              if (now - p.userData.staleSince > STALE_MS) {
+                bg.visible = false; // cache mais ne touche pas detected
+                continue;
+              }
+            } else {
+              p.userData.lastTx = tx;
+              p.userData.lastTy = ty;
+              p.userData.lastTz = tz;
+              p.userData.staleSince = null;
+            }
+
+            // Check hors-cadre (projection NDC)
             bg.parent.getWorldPosition(_ndcPos);
             _ndcPos.project(camera);
             const inFrame = Math.abs(_ndcPos.x) <= 1
