@@ -167,10 +167,10 @@
           container: document.getElementById('container'),
           imageTargetSrc: './assets/targets.mind',
           uiLoading: 'no', uiScanning: 'no', uiError: 'no',
-          // Tracking : reglages proches des defauts MindAR pour suivi reactif
+          // Tracking : reglages defauts + missTolerance bas (anti planes fantomes)
           filterMinCF: 0.0001,
           filterBeta: 0.001,
-          missTolerance: 8,        // perte declaree apres ~0.27s (anti planes fantomes)
+          missTolerance: 3,        // perte declaree tres vite
           warmupTolerance: 5,
           maxTrack: 3
         });
@@ -451,37 +451,15 @@
           }
         }
 
-        // Render loop : billboard + visibility + detection matrix figee
+        // Render loop : billboard + visibility synchronisee MindAR
         const _parentQ = new THREE.Quaternion();
         const _camQ = new THREE.Quaternion();
-        const STALE_TIMEOUT_MS = 400; // matrix figee >400ms = cible perdue silencieusement
         renderer.setAnimationLoop(() => {
           scene.updateMatrixWorld(true);
           camera.updateMatrixWorld(true);
-          const now = performance.now();
           for (const p of trackedPlanes) {
             const bg = p.userData.billboardGroup;
             if (!bg || !bg.parent) continue;
-
-            // Detection "stale" : si la matrix MindAR ne bouge plus, cible perdue
-            if (p.userData.detected) {
-              const m = bg.parent.matrix.elements;
-              const tx = m[12], ty = m[13], tz = m[14];
-              if (p.userData.lastTx === tx && p.userData.lastTy === ty && p.userData.lastTz === tz) {
-                if (!p.userData.staleSince) p.userData.staleSince = now;
-                if (now - p.userData.staleSince > STALE_TIMEOUT_MS) {
-                  forceLost(p);
-                  bg.visible = false;
-                  continue;
-                }
-              } else {
-                p.userData.lastTx = tx;
-                p.userData.lastTy = ty;
-                p.userData.lastTz = tz;
-                p.userData.staleSince = null;
-              }
-            }
-
             const trulyVisible = !!p.userData.detected && !!bg.parent.visible;
             bg.visible = trulyVisible;
             if (!trulyVisible) continue;
