@@ -196,6 +196,7 @@
 
         let overlayActive = false;
         let activeCfg = null;
+        let currentDetectedCfg = null; // cible actuellement detectee (pour le tap)
 
         const overlayCaption = document.getElementById('overlay-caption');
         const videoLoader = document.getElementById('video-loader');
@@ -311,11 +312,10 @@
             texture.needsUpdate = true;
           }
 
-          let pendingOverlayTimer = null;
-
           anchor.onTargetFound = () => {
             if (overlayActive) return;
-            hint.classList.add('hidden');
+            currentDetectedCfg = cfg;
+            hint.textContent = 'Touchez pour ouvrir la vidéo';
             scanFrame.classList.add('hidden');
             applyFit();
 
@@ -359,15 +359,12 @@
             // Toujours redemarrer la video au debut pour ne pas spoiler
             try { videoEl.currentTime = 0; } catch (e) {}
             videoEl.play().catch(e => console.warn('video play blocked', cfg.index, e));
-
-            // Phase 3 : ouverture overlay plein ecran apres delai global
-            clearTimeout(pendingOverlayTimer);
-            pendingOverlayTimer = setTimeout(() => openOverlay(cfg), OVERLAY_DELAY);
+            // L'ouverture plein ecran est maintenant declenchee par un tap utilisateur
           };
           anchor.onTargetLost = () => {
-            clearTimeout(pendingOverlayTimer);
+            if (currentDetectedCfg === cfg) currentDetectedCfg = null;
             if (!overlayActive) {
-              hint.classList.remove('hidden');
+              hint.textContent = 'Pointez vers une image du poster';
               scanFrame.classList.remove('hidden');
               videoEl.pause();
               try { videoEl.currentTime = 0; } catch (e) {}
@@ -383,6 +380,13 @@
 
         await mindar.start();
         renderer.setAnimationLoop(() => renderer.render(scene, camera));
+
+        // Tap sur la zone camera : ouvre l'overlay si une cible est actuellement detectee
+        document.getElementById('container').addEventListener('click', () => {
+          if (currentDetectedCfg && !overlayActive) {
+            openOverlay(currentDetectedCfg);
+          }
+        });
 
         // === Controle de zoom camera ===
         // Hardware (Android Chrome via MediaTrack.zoom) OU fallback CSS (iOS, etc.)
