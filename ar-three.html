@@ -167,12 +167,12 @@
           container: document.getElementById('container'),
           imageTargetSrc: './assets/targets.mind',
           uiLoading: 'no', uiScanning: 'no', uiError: 'no',
-          // Lissage tracking : valeurs ajustees pour suivi tres stable
-          filterMinCF: 0.000001,
-          filterBeta: 0.00001,
-          missTolerance: 30,
+          // Tracking : reglages proches des defauts MindAR pour suivi reactif
+          filterMinCF: 0.0001,
+          filterBeta: 0.001,
+          missTolerance: 8,        // perte declaree apres ~0.27s (anti planes fantomes)
           warmupTolerance: 5,
-          maxTrack: 3              // 3 cibles (toutes)
+          maxTrack: 3
         });
         const { renderer, scene, camera } = mindar;
 
@@ -436,10 +436,11 @@
           camera.updateMatrixWorld(true);
           for (const p of trackedPlanes) {
             const bg = p.userData.billboardGroup;
-            if (!bg) continue;
-            // Forcer la visibilite explicitement (sinon parfois reste visible apres lost)
-            bg.visible = !!p.userData.detected;
-            if (!p.userData.detected || !bg.parent) continue;
+            if (!bg || !bg.parent) continue;
+            // Visible UNIQUEMENT si JS et MindAR sont d'accord (cible vraiment trackee)
+            const trulyVisible = !!p.userData.detected && !!bg.parent.visible;
+            bg.visible = trulyVisible;
+            if (!trulyVisible) continue;
             bg.parent.getWorldQuaternion(_parentQ).invert();
             camera.getWorldQuaternion(_camQ);
             bg.quaternion.copy(_parentQ).multiply(_camQ);
