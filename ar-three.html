@@ -172,17 +172,15 @@
           filterBeta: 0.00001,
           missTolerance: 30,
           warmupTolerance: 5,
-          maxTrack: 4              // tracker toutes les cibles
+          maxTrack: 3              // 3 cibles (toutes)
         });
         const { renderer, scene, camera } = mindar;
 
-        // === Configuration des cibles ===
-        // Chaque entree : index = targetIndex, src = video, caption = fichier texte (optionnel)
+        // === Configuration des cibles (3 cibles) ===
         const TARGETS = [
           { index: 0, src: './assets/videos/clip0.mp4', captionUrl: './assets/captions/1.txt' },
           { index: 1, src: './assets/videos/clip1.mp4', captionUrl: './assets/captions/2.txt' },
-          { index: 2, src: './assets/videos/clip2.mp4', captionUrl: './assets/captions/3.txt' },
-          { index: 3, src: './assets/videos/clip3.mp4', captionUrl: './assets/captions/4.txt' }
+          { index: 2, src: './assets/videos/clip2.mp4', captionUrl: './assets/captions/3.txt' }
         ];
 
         // Pre-fetch des captions en arriere-plan
