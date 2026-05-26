@@ -430,18 +430,18 @@
 
         await mindar.start();
 
-        // Render loop avec billboard : chaque cible reste face camera (planimetrie)
+        // Render loop avec billboard + force visibility selon state detected
         const _parentQ = new THREE.Quaternion();
         const _camQ = new THREE.Quaternion();
         renderer.setAnimationLoop(() => {
-          // CRUCIAL : updateWorldMatrix() avant lecture des quaternions
-          // (sans ca, le billboard utilise des valeurs perimees -> sauts/bugs)
           scene.updateMatrixWorld(true);
           camera.updateMatrixWorld(true);
           for (const p of trackedPlanes) {
-            if (!p.userData.detected) continue;
             const bg = p.userData.billboardGroup;
-            if (!bg || !bg.parent) continue;
+            if (!bg) continue;
+            // Forcer la visibilite explicitement (sinon parfois reste visible apres lost)
+            bg.visible = !!p.userData.detected;
+            if (!p.userData.detected || !bg.parent) continue;
             bg.parent.getWorldQuaternion(_parentQ).invert();
             camera.getWorldQuaternion(_camQ);
             bg.quaternion.copy(_parentQ).multiply(_camQ);
